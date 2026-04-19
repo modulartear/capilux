@@ -36,6 +36,8 @@ import {
   ClipboardList,
   RefreshCw,
   ExternalLink,
+  Search,
+  Download,
 } from 'lucide-react'
 
 interface Product {
@@ -300,6 +302,20 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
   const [andreaniTestResult, setAndreaniTestResult] = useState<{ success: boolean; message: string } | null>(null)
   const [andreaniTesting, setAndreaniTesting] = useState(false)
 
+  // Dropi states
+  const [dropiEmail, setDropiEmail] = useState('')
+  const [dropiPassword, setDropiPassword] = useState('')
+  const [dropiToken, setDropiToken] = useState('')
+  const [dropiConnected, setDropiConnected] = useState(false)
+  const [dropiConnecting, setDropiConnecting] = useState(false)
+  const [dropiError, setDropiError] = useState('')
+  const [dropiSearch, setDropiSearch] = useState('')
+  const [dropiProducts, setDropiProducts] = useState<any[]>([])
+  const [dropiTotal, setDropiTotal] = useState(0)
+  const [dropiPage, setDropiPage] = useState(0)
+  const [dropiLoading, setDropiLoading] = useState(false)
+  const [dropiImporting, setDropiImporting] = useState<string | null>(null)
+
   // Fetch config
   const fetchConfig = useCallback(async () => {
     try {
@@ -313,6 +329,8 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
         if (data.ANDREANI_PASSWORD) setAndreaniPassword(data.ANDREANI_PASSWORD)
         if (data.ANDREANI_CONTRACT) setAndreaniContract(data.ANDREANI_CONTRACT)
         if (data.ANDREANI_SENDER_CP) setAndreaniSenderCp(data.ANDREANI_SENDER_CP)
+        if (data.DROPI_TOKEN) { setDropiToken(data.DROPI_TOKEN); setDropiConnected(true) }
+        if (data.DROPI_EMAIL) setDropiEmail(data.DROPI_EMAIL)
       }
     } catch {
       // ignore
@@ -547,6 +565,100 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
     }
   }
 
+  // Dropi handlers
+  const handleDropiConnect = async () => {
+    setDropiConnecting(true)
+    setDropiError('')
+    try {
+      const res = await fetch('/api/dropi/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: dropiEmail, password: dropiPassword }),
+      })
+      const data = await res.json()
+      if (res.ok && data.token) {
+        setDropiToken(data.token)
+        setDropiConnected(true)
+        await fetch('/api/config', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ configs: { DROPI_TOKEN: data.token, DROPI_EMAIL: dropiEmail } }),
+        })
+      } else {
+        setDropiError(data.error || 'Error al conectar con Dropi')
+      }
+    } catch {
+      setDropiError('Error de conexion con Dropi')
+    } finally {
+      setDropiConnecting(false)
+    }
+  }
+
+  const handleDropiDisconnect = () => {
+    setDropiToken('')
+    setDropiConnected(false)
+    setDropiProducts([])
+    setDropiSearch('')
+  }
+
+  const handleDropiSearch = async (page = 0) => {
+    if (!dropiToken) return
+    setDropiLoading(true)
+    setDropiError('')
+    try {
+      const res = await fetch('/api/dropi/products', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dropiToken, keywords: dropiSearch, page, pageSize: 20 }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setDropiProducts(data.products || [])
+        setDropiTotal(data.total || 0)
+        setDropiPage(page)
+      } else {
+        setDropiError(data.error || 'Error al buscar productos')
+      }
+    } catch {
+      setDropiError('Error de conexion')
+    } finally {
+      setDropiLoading(false)
+    }
+  }
+
+  const handleDropiImport = async (product: any) => {
+    if (!dropiToken) return
+    setDropiImporting(product.id)
+    try {
+      const res = await fetch('/api/dropi/import', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          dropiId: product.id,
+          name: product.name,
+          description: product.description || `Producto importado de Dropi${product.sku ? ` - SKU: ${product.sku}` : ''}`,
+          price: product.suggestedPrice || product.price,
+          image1: product.image || (product.images && product.images[0]) || null,
+          image2: (product.images && product.images[1]) || null,
+          dropiPrice: product.price,
+          stock: product.stock,
+          sku: product.sku,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        fetchData()
+        alert(data.updated ? 'Producto actualizado correctamente' : 'Producto importado correctamente a tu tienda')
+      } else {
+        alert(data.error || 'Error al importar producto')
+      }
+    } catch {
+      alert('Error de conexion')
+    } finally {
+      setDropiImporting(null)
+    }
+  }
+
   // Login screen
   if (authenticated === false) {
     return (
@@ -640,6 +752,7 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
               <TabsTrigger value="combos" className="gap-1.5 text-xs sm:text-sm"><Layers className="w-4 h-4" />Combos</TabsTrigger>
               <TabsTrigger value="pedidos" className="gap-1.5 text-xs sm:text-sm"><ClipboardList className="w-4 h-4" />Pedidos</TabsTrigger>
               <TabsTrigger value="envios" className="gap-1.5 text-xs sm:text-sm"><Truck className="w-4 h-4" />Andreani</TabsTrigger>
+              <TabsTrigger value="dropi" className="gap-1.5 text-xs sm:text-sm"><Download className="w-4 h-4" />Dropi</TabsTrigger>
               <TabsTrigger value="config" className="gap-1.5 text-xs sm:text-sm"><CreditCard className="w-4 h-4" /><span className="hidden sm:inline">MP</span></TabsTrigger>
             </TabsList>
           </div>
@@ -996,6 +1109,153 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
                 </Button>
                 {configSaved && (
                   <p className="text-emerald-600 text-sm flex items-center gap-1"><Check className="w-4 h-4" /> Configuracion guardada correctamente</p>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Dropi Tab */}
+          <TabsContent value="dropi" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Download className="w-5 h-5" />
+                  Importar de Dropi
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <p className="text-gray-500 text-sm">
+                  Conecta tu cuenta de Dropi para importar productos directamente a tu tienda.
+                  Los productos se sincronizan automaticamente con imagenes, precios sugeridos y stock disponible.
+                  Registrate en{' '}
+                  <a href="https://app.dropi.co" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-700">app.dropi.co</a>.
+                </p>
+
+                {!dropiConnected ? (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="dropiEmail" className="text-sm font-medium">Email de Dropi</Label>
+                        <Input id="dropiEmail" type="email" value={dropiEmail} onChange={(e) => setDropiEmail(e.target.value)} placeholder="tu@email.com" />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label htmlFor="dropiPass" className="text-sm font-medium">Contrasena de Dropi</Label>
+                        <Input id="dropiPass" type="password" value={dropiPassword} onChange={(e) => setDropiPassword(e.target.value)} placeholder="Tu contrasena de Dropi" />
+                      </div>
+                    </div>
+                    {dropiError && <p className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{dropiError}</p>}
+                    <Button onClick={handleDropiConnect} disabled={dropiConnecting || !dropiEmail || !dropiPassword} className="bg-violet-600 hover:bg-violet-700 gap-2">
+                      {dropiConnecting && <Loader2 className="w-4 h-4 animate-spin" />}
+                      {dropiConnecting ? 'Conectando...' : 'Conectar con Dropi'}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between bg-emerald-50 border border-emerald-200 rounded-lg p-3">
+                      <div className="flex items-center gap-2">
+                        <Check className="w-5 h-5 text-emerald-600" />
+                        <span className="text-emerald-700 font-medium text-sm">Conectado a Dropi</span>
+                      </div>
+                      <Button variant="outline" size="sm" onClick={handleDropiDisconnect} className="text-red-500 hover:text-red-600 text-xs">
+                        Desconectar
+                      </Button>
+                    </div>
+
+                    <div className="flex gap-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                        <Input
+                          placeholder="Buscar productos en Dropi (vitaminas, proteinas, suplementos...)"
+                          value={dropiSearch}
+                          onChange={(e) => setDropiSearch(e.target.value)}
+                          className="pl-10"
+                          onKeyDown={(e) => e.key === 'Enter' && handleDropiSearch(0)}
+                        />
+                      </div>
+                      <Button onClick={() => handleDropiSearch(0)} disabled={dropiLoading} className="bg-violet-600 hover:bg-violet-700 gap-2">
+                        {dropiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                        Buscar
+                      </Button>
+                    </div>
+
+                    {dropiError && <p className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{dropiError}</p>}
+
+                    {dropiProducts.length > 0 && (
+                      <>
+                        <div className="text-sm text-gray-500">
+                          {dropiTotal} productos encontrados - Pagina {dropiPage + 1}
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                          {dropiProducts.map((p: any) => (
+                            <Card key={p.id} className="overflow-hidden border-violet-100">
+                              <div className="flex gap-3 p-4">
+                                <div className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+                                  {p.image ? (
+                                    <img src={p.image} alt="" className="w-full h-full object-cover" crossOrigin="anonymous" />
+                                  ) : (
+                                    <div className="w-full h-full flex items-center justify-center"><Package className="w-8 h-8 text-gray-300" /></div>
+                                  )}
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  <h3 className="font-semibold text-gray-800 text-sm truncate">{p.name}</h3>
+                                  {p.suggestedPrice > 0 && (
+                                    <p className="text-emerald-600 font-bold mt-1 text-sm">${p.suggestedPrice.toLocaleString('es-AR')}</p>
+                                  )}
+                                  {p.price > 0 && (
+                                    <p className="text-gray-400 text-xs">Costo: ${p.price.toLocaleString('es-AR')}</p>
+                                  )}
+                                  <div className="flex items-center gap-2 mt-1">
+                                    {p.stock > 0 ? (
+                                      <Badge className="bg-emerald-100 text-emerald-700 text-xs">Stock: {p.stock}</Badge>
+                                    ) : (
+                                      <Badge className="bg-red-100 text-red-600 text-xs">Sin stock</Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex border-t">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="flex-1 rounded-none text-violet-600 hover:text-violet-700 hover:bg-violet-50 gap-1 text-xs"
+                                  disabled={dropiImporting === p.id}
+                                  onClick={() => handleDropiImport(p)}
+                                >
+                                  {dropiImporting === p.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Download className="w-3.5 h-3.5" />}
+                                  {dropiImporting === p.id ? 'Importando...' : 'Importar'}
+                                </Button>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+
+                        <div className="flex justify-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={dropiPage === 0 || dropiLoading}
+                            onClick={() => handleDropiSearch(dropiPage - 1)}
+                          >
+                            Anterior
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            disabled={(dropiPage + 1) * 20 >= dropiTotal || dropiLoading}
+                            onClick={() => handleDropiSearch(dropiPage + 1)}
+                          >
+                            Siguiente
+                          </Button>
+                        </div>
+                      </>
+                    )}
+
+                    {dropiProducts.length === 0 && !dropiLoading && dropiSearch && (
+                      <div className="text-center py-8 text-gray-400">
+                        No se encontraron productos. Intenta con otros terminos de busqueda.
+                      </div>
+                    )}
+                  </div>
                 )}
               </CardContent>
             </Card>

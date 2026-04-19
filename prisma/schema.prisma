@@ -16,6 +16,7 @@ model Product {
   image2      String?
   isCombo     Boolean  @default(false)
   isActive    Boolean  @default(true)
+  dropiId     String?  @unique
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 }
