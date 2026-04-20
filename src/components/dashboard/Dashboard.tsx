@@ -303,8 +303,7 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
   const [andreaniTesting, setAndreaniTesting] = useState(false)
 
   // Dropi states
-  const [dropiEmail, setDropiEmail] = useState('')
-  const [dropiPassword, setDropiPassword] = useState('')
+  const [dropiIntegrationKey, setDropiIntegrationKey] = useState('')
   const [dropiToken, setDropiToken] = useState('')
   const [dropiConnected, setDropiConnected] = useState(false)
   const [dropiConnecting, setDropiConnecting] = useState(false)
@@ -329,8 +328,11 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
         if (data.ANDREANI_PASSWORD) setAndreaniPassword(data.ANDREANI_PASSWORD)
         if (data.ANDREANI_CONTRACT) setAndreaniContract(data.ANDREANI_CONTRACT)
         if (data.ANDREANI_SENDER_CP) setAndreaniSenderCp(data.ANDREANI_SENDER_CP)
-        if (data.DROPI_TOKEN) { setDropiToken(data.DROPI_TOKEN); setDropiConnected(true) }
-        if (data.DROPI_EMAIL) setDropiEmail(data.DROPI_EMAIL)
+        if (data.DROPI_TOKEN) {
+          setDropiToken(data.DROPI_TOKEN)
+          setDropiIntegrationKey(data.DROPI_TOKEN)
+          setDropiConnected(true)
+        }
       }
     } catch {
       // ignore
@@ -567,25 +569,30 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
 
   // Dropi handlers
   const handleDropiConnect = async () => {
+    if (!dropiIntegrationKey.trim()) {
+      setDropiError('Ingresa tu Integration Key de Dropi')
+      return
+    }
     setDropiConnecting(true)
     setDropiError('')
     try {
       const res = await fetch('/api/dropi/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: dropiEmail, password: dropiPassword }),
+        body: JSON.stringify({ integrationKey: dropiIntegrationKey.trim() }),
       })
       const data = await res.json()
       if (res.ok && data.token) {
         setDropiToken(data.token)
         setDropiConnected(true)
+        // Guardar en la DB para persistir
         await fetch('/api/config', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ configs: { DROPI_TOKEN: data.token, DROPI_EMAIL: dropiEmail } }),
+          body: JSON.stringify({ configs: { DROPI_TOKEN: data.token } }),
         })
       } else {
-        setDropiError(data.error || 'Error al conectar con Dropi')
+        setDropiError(data.error || 'Token invalido. Verifica tu Integration Key en app.dropi.co')
       }
     } catch {
       setDropiError('Error de conexion con Dropi')
@@ -596,6 +603,7 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
 
   const handleDropiDisconnect = () => {
     setDropiToken('')
+    setDropiIntegrationKey('')
     setDropiConnected(false)
     setDropiProducts([])
     setDropiSearch('')
@@ -638,8 +646,8 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
           name: product.name,
           description: product.description || `Producto importado de Dropi${product.sku ? ` - SKU: ${product.sku}` : ''}`,
           price: product.suggestedPrice || product.price,
-          image1: product.image || (product.images && product.images[0]) || null,
-          image2: (product.images && product.images[1]) || null,
+          image1: product.image1 || product.image || (product.images && product.images[0]) || null,
+          image2: product.image2 || (product.images && product.images[1]) || null,
           dropiPrice: product.price,
           stock: product.stock,
           sku: product.sku,
@@ -1125,28 +1133,32 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
               </CardHeader>
               <CardContent className="space-y-5">
                 <p className="text-gray-500 text-sm">
-                  Conecta tu cuenta de Dropi para importar productos directamente a tu tienda.
-                  Los productos se sincronizan automaticamente con imagenes, precios sugeridos y stock disponible.
+                  Importa productos de Dropi a tu tienda. Necesitas tu <b>Integration Key</b> (token de integracion)
+                  que se genera desde el panel de Dropi en la seccion de <b>Tiendas</b> o <b>Integraciones</b>.
                   Registrate en{' '}
                   <a href="https://app.dropi.co" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-700">app.dropi.co</a>.
                 </p>
 
                 {!dropiConnected ? (
                   <div className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <Label htmlFor="dropiEmail" className="text-sm font-medium">Email de Dropi</Label>
-                        <Input id="dropiEmail" type="email" value={dropiEmail} onChange={(e) => setDropiEmail(e.target.value)} placeholder="tu@email.com" />
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="dropiPass" className="text-sm font-medium">Contrasena de Dropi</Label>
-                        <Input id="dropiPass" type="password" value={dropiPassword} onChange={(e) => setDropiPassword(e.target.value)} placeholder="Tu contrasena de Dropi" />
-                      </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="dropiKey" className="text-sm font-medium">Integration Key de Dropi</Label>
+                      <Input
+                        id="dropiKey"
+                        type="text"
+                        value={dropiIntegrationKey}
+                        onChange={(e) => setDropiIntegrationKey(e.target.value)}
+                        placeholder="Pega aqui tu Integration Key de Dropi..."
+                        className="font-mono text-sm"
+                      />
+                      <p className="text-xs text-gray-400">
+                        Encontra tu Integration Key en: app.dropi.co {'>'} Tiendas {'>'} tu tienda {'>'} Token de integracion
+                      </p>
                     </div>
                     {dropiError && <p className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{dropiError}</p>}
-                    <Button onClick={handleDropiConnect} disabled={dropiConnecting || !dropiEmail || !dropiPassword} className="bg-violet-600 hover:bg-violet-700 gap-2">
+                    <Button onClick={handleDropiConnect} disabled={dropiConnecting || !dropiIntegrationKey.trim()} className="bg-violet-600 hover:bg-violet-700 gap-2">
                       {dropiConnecting && <Loader2 className="w-4 h-4 animate-spin" />}
-                      {dropiConnecting ? 'Conectando...' : 'Conectar con Dropi'}
+                      {dropiConnecting ? 'Validando...' : 'Conectar con Dropi'}
                     </Button>
                   </div>
                 ) : (

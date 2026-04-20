@@ -33,13 +33,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Datos del producto requeridos' }, { status: 400 })
     }
 
-    // Check if product already exists by dropiId
+    // Verificar si el producto ya existe (por dropiId)
     const existing = await db.product.findUnique({
       where: { dropiId },
     })
 
     if (existing) {
-      // Update existing product
+      // Actualizar producto existente manteniendo el precio que el usuario haya configurado
       const updated = await db.product.update({
         where: { dropiId },
         data: {
@@ -48,12 +48,13 @@ export async function POST(request: NextRequest) {
           price: parseFloat(price) || existing.price,
           image1: image1 || existing.image1,
           image2: image2 || existing.image2,
+          isActive: true,
         },
       })
       return NextResponse.json({ success: true, product: updated, updated: true })
     }
 
-    // Create new product
+    // Crear nuevo producto
     const product = await db.product.create({
       data: {
         name,
@@ -68,7 +69,8 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json({ success: true, product, updated: false })
-  } catch {
+  } catch (error) {
+    console.error('Dropi import error:', error)
     return NextResponse.json({ error: 'Error al importar producto' }, { status: 500 })
   }
 }
