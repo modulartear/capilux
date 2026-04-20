@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://docs.unity3d.com/es/2019.4/Manual/UnityIntegrations.html",
+    "name": "Unity Integrations - Unity Manual",
+    "snippet": "Integración utilizando el API de Alto Nivel de Unity · Integración utilizando el NetworkTransport · Errores comunes · Customized ...",
+    "host_name": "docs.unity3d.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://catalogue.odis.org/search/type=4",
+    "name": "IOC Ocean Data and Information System Catalogue",
+    "snippet": "Search Page Reset form. Type something in the input field to search for a specific text inside all entries of the catalogue. Typing multiple words will show ...\nSearch Page Reset form. Type something in the input field to search for a specific text inside all entries of the catalogue. Typing multiple words will show ... Read more",
+    "host_name": "catalogue.odis.org",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://app.dropi.co",
+    "name": "Dropi",
+    "snippet": "Plataforma dropshipping! Missing: integracion endpoint",
+    "host_name": "app.dropi.co",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/datosgobar/series-tiempo-ar-api/issues/249",
+    "name": "Crear Jupyter Notebook con tests de integración que usan la API y",
+    "snippet": "La herramienta debe testear el funcionamiento de los endpoints series y search de la API automatizando lo que haría un usuario que le pegara ...",
+    "host_name": "github.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=NvzsO9shLJw",
+    "name": "How to Integrate Open AI with Dropi to Generate Product Descriptions",
+    "snippet": "... API secreta 1:50 - Inserção do token no Dropi e conexão bem-sucedida 2:05 - Definição do limite de gastos mensal para controlar custos na ... Missing: integracion productos endpoint",
+    "host_name": "www.youtube.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://es.radware.com/security/ddos-knowledge-center/ddospedia/arp-poisoning",
+    "name": "Envenenamiento de ARP - Radware",
+    "snippet": "API seguras · Mitigue los bots maliciosos y las amenazas automatizadas ...",
+    "host_name": "es.radware.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://search.abb.com/library/Download.aspx?DocumentID=3HAC032104-005&LanguageCode=es&DocumentPartId=&Action=Launch",
+    "name": "[PDF] Manual del operador - RobotStudio - ABB",
+    "snippet": "La información de este manual puede cambiar sin previo aviso y no puede entenderse como un compromiso por parte de ABB. ABB no se hace responsable de ningún.",
+    "host_name": "search.abb.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.hostinger.com/ar/tutoriales/como-utilizar-una-api-en-n8n",
+    "name": "Cómo utilizar una API con n8n en una configuración autoalojada",
+    "snippet": "La integración de una API en tu flujo de trabajo n8n consta de diez pasos: Configurar tu propio n8n en un servidor privado; Habilitar el acceso ...",
+    "host_name": "www.hostinger.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "http://institucional.pami.org.ar/compras/archivos/LPU_3_2025_NC_1.pdf",
+    "name": "[PDF] 2025 - “Año de la Reconstrucción de la Nación Argentina” - PAMI",
+    "snippet": "La API REST de los productos debe admitir la reversión de transacciones ... Permitir definición del API endpoint, métodos HTTP permitidos,.\n1 Jan 2025 — La API REST de los productos debe admitir la reversión de transacciones ... Permitir definición del API endpoint , métodos HTTP permitidos,. Read more",
+    "host_name": "institucional.pami.org.ar",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://es.scribd.com/document/804372978/Integrations-Core-Dropi-2",
+    "name": "Documentación API de Integraciones Dropi | PDF | Informática - Scribd",
+    "snippet": "Obtener Productos. • Complemento Url: /products/index. • Método: POST • Headers: dropi-integracion-key = “Token:_Integracion” • Body: raw. ➢ pageSize: o tipo ...",
+    "host_name": "es.scribd.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

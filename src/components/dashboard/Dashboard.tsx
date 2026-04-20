@@ -304,6 +304,7 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
 
   // Dropi states
   const [dropiIntegrationKey, setDropiIntegrationKey] = useState('')
+  const [dropiCountry, setDropiCountry] = useState('AR')
   const [dropiToken, setDropiToken] = useState('')
   const [dropiConnected, setDropiConnected] = useState(false)
   const [dropiConnecting, setDropiConnecting] = useState(false)
@@ -333,6 +334,7 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
           setDropiIntegrationKey(data.DROPI_TOKEN)
           setDropiConnected(true)
         }
+        if (data.DROPI_COUNTRY) setDropiCountry(data.DROPI_COUNTRY)
       }
     } catch {
       // ignore
@@ -579,7 +581,7 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
       const res = await fetch('/api/dropi/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ integrationKey: dropiIntegrationKey.trim() }),
+        body: JSON.stringify({ integrationKey: dropiIntegrationKey.trim(), country: dropiCountry }),
       })
       const data = await res.json()
       if (res.ok && data.token) {
@@ -617,7 +619,7 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
       const res = await fetch('/api/dropi/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ dropiToken, keywords: dropiSearch, page, pageSize: 20 }),
+        body: JSON.stringify({ dropiToken, keywords: dropiSearch, page, pageSize: 20, country: dropiCountry }),
       })
       const data = await res.json()
       if (res.ok) {
@@ -1136,25 +1138,46 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
                   Importa productos de Dropi a tu tienda. Necesitas tu <b>Integration Key</b> (token de integracion)
                   que se genera desde el panel de Dropi en la seccion de <b>Tiendas</b> o <b>Integraciones</b>.
                   Registrate en{' '}
-                  <a href="https://app.dropi.co" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-700">app.dropi.co</a>.
+                  <a href="https://app.dropi.ar" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-700">app.dropi.ar</a>.
                 </p>
 
                 {!dropiConnected ? (
                   <div className="space-y-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="dropiKey" className="text-sm font-medium">Integration Key de Dropi</Label>
-                      <Input
-                        id="dropiKey"
-                        type="text"
-                        value={dropiIntegrationKey}
-                        onChange={(e) => setDropiIntegrationKey(e.target.value)}
-                        placeholder="Pega aqui tu Integration Key de Dropi..."
-                        className="font-mono text-sm"
-                      />
-                      <p className="text-xs text-gray-400">
-                        Encontra tu Integration Key en: app.dropi.co {'>'} Tiendas {'>'} tu tienda {'>'} Token de integracion
-                      </p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="space-y-1.5">
+                        <Label htmlFor="dropiCountry" className="text-sm font-medium">Pais</Label>
+                        <select
+                          id="dropiCountry"
+                          value={dropiCountry}
+                          onChange={(e) => setDropiCountry(e.target.value)}
+                          className="w-full h-9 rounded-md border border-gray-300 bg-white px-3 text-sm focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                        >
+                          <option value="AR">Argentina (dropi.ar)</option>
+                          <option value="CO">Colombia (dropi.co)</option>
+                          <option value="CL">Chile (dropi.cl)</option>
+                          <option value="MX">Mexico (dropi.mx)</option>
+                          <option value="PE">Peru (dropi.pe)</option>
+                          <option value="EC">Ecuador (dropi.ec)</option>
+                          <option value="PA">Panama (dropi.pa)</option>
+                          <option value="PY">Paraguay (dropi.com.py)</option>
+                          <option value="ES">Espana (dropi.com.es)</option>
+                        </select>
+                      </div>
+                      <div className="space-y-1.5 md:col-span-2">
+                        <Label htmlFor="dropiKey" className="text-sm font-medium">Integration Key de Dropi</Label>
+                        <Input
+                          id="dropiKey"
+                          type="text"
+                          value={dropiIntegrationKey}
+                          onChange={(e) => setDropiIntegrationKey(e.target.value)}
+                          placeholder="Pega aqui tu Integration Key de Dropi..."
+                          className="font-mono text-sm"
+                        />
+                      </div>
                     </div>
+                    <p className="text-xs text-gray-400">
+                      Encontra tu Integration Key en: app.<b>{dropiCountry === 'AR' ? 'dropi.ar' : dropiCountry === 'CO' ? 'dropi.co' : 'dropi.' + dropiCountry.toLowerCase()}</b> {'>'} Tiendas {'>'} tu tienda {'>'} Token de integracion
+                    </p>
                     {dropiError && <p className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{dropiError}</p>}
                     <Button onClick={handleDropiConnect} disabled={dropiConnecting || !dropiIntegrationKey.trim()} className="bg-violet-600 hover:bg-violet-700 gap-2">
                       {dropiConnecting && <Loader2 className="w-4 h-4 animate-spin" />}

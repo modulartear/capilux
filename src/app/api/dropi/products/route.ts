@@ -9,11 +9,22 @@ async function authenticate(request: NextRequest) {
   return !!payload
 }
 
-// Dropi API: https://api.dropi.co/integrations/
-// Autenticacion via header: dropi-integration-key
-// Respuesta usa formato: { isSuccess: true, objects: [...], message: "..." }
+// URLs de Dropi por pais
+const DROPI_API_URLS: Record<string, string> = {
+  AR: 'https://api.dropi.ar',
+  CO: 'https://api.dropi.co',
+  MX: 'https://api.dropi.mx',
+  CL: 'https://api.dropi.cl',
+  PE: 'https://api.dropi.pe',
+  EC: 'https://api.dropi.ec',
+  PA: 'https://api.dropi.pa',
+  PY: 'https://api.dropi.com.py',
+  ES: 'https://api.dropi.com.es',
+}
 
-const DROPI_API_BASE = 'https://api.dropi.co'
+function getDropiApiUrl(country: string): string {
+  return DROPI_API_URLS[country] || DROPI_API_URLS.AR || 'https://api.dropi.ar'
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -22,16 +33,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No autorizado' }, { status: 401 })
     }
 
-    // Obtener el token de Dropi desde el body o desde la DB
     const body = await request.json()
     const dropiToken = body.dropiToken
     const keywords = body.keywords || ''
     const page = body.page || 0
     const pageSize = Math.min(body.pageSize || 20, 50)
+    const country = body.country || 'AR'
 
     if (!dropiToken) {
       return NextResponse.json({ error: 'Token de Dropi requerido' }, { status: 400 })
     }
+
+    const apiUrl = getDropiApiUrl(country)
 
     // Construir payload segun la documentacion oficial de Dropi
     const searchPayload: Record<string, unknown> = {
@@ -51,11 +64,10 @@ export async function POST(request: NextRequest) {
     if (keywords) {
       searchPayload.keywords = keywords
     } else {
-      // Sin busqueda: traer productos favoritos/destacados
       searchPayload.favorite = true
     }
 
-    const res = await fetch(`${DROPI_API_BASE}/integrations/products/index`, {
+    const res = await fetch(`${apiUrl}/integrations/products/index`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json;charset=UTF-8',
@@ -78,26 +90,23 @@ export async function POST(request: NextRequest) {
     // Dropi responde con { isSuccess, objects: [...productos...], message }
     const rawProducts = data.objects || data.products || []
 
-    // Normalizar datos de productos de Dropi al formato de nuestra app
+    // Normalizar datos de productos
     const products = rawProducts.map((p: Record<string, unknown>) => {
-      // Las imagenes vienen en formato: photos: [{ url, urlS3 }] o images: [string]
       const photos = p.photos || []
       let image1 = ''
       let image2 = ''
       const images: string[] = []
 
       if (Array.isArray(photos) && photos.length > 0) {
-        // Dropi devuelve photos con url relativa, necesitamos prefijar con la API base
         for (const photo of photos) {
           const photoObj = photo as Record<string, unknown>
           const url = photoObj.urlS3 || photoObj.url || String(photo)
-          // Completar URL si es relativa
           if (url.startsWith('http')) {
             images.push(url)
           } else if (photoObj.urlS3) {
             images.push(`https://d39ru7awumhhs2.cloudfront.net/${url}`)
           } else {
-            images.push(`${DROPI_API_BASE}${url.startsWith('/') ? '' : '/'}${url}`)
+            images.push(`${apiUrl}${url.startsWith('/') ? '' : '/'}${url}`)
           }
         }
         image1 = images[0] || ''
@@ -105,17 +114,15 @@ export async function POST(request: NextRequest) {
       } else if (p.image || p.thumb) {
         image1 = p.image as string || p.thumb as string || ''
         if (image1 && !image1.startsWith('http')) {
-          image1 = `${DROPI_API_BASE}${image1.startsWith('/') ? '' : '/'}${image1}`
+          image1 = `${apiUrl}${image1.startsWith('/') ? '' : '/'}${image1}`
         }
       }
 
-      // Obtener categorias como string
       const categories = p.categories || []
       const categoryName = Array.isArray(categories) && categories.length > 0
         ? (categories[0] as Record<string, unknown>).name || String(categories[0])
         : ''
 
-      // Obtener nombre del deposito
       const warehouseProduct = p.warehouse_product
       const warehouseName = warehouseProduct
         ? (warehouseProduct as Record<string, unknown>).warehouse_name || ''
@@ -139,7 +146,6 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // Contar total (Dropi puede no devolverlo con no_count: true)
     const total = data.total || data.count || (rawProducts.length > 0 ? (page + 1) * pageSize : 0)
 
     return NextResponse.json({

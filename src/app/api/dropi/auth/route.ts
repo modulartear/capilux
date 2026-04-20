@@ -9,11 +9,22 @@ async function authenticate(request: NextRequest) {
   return !!payload
 }
 
-// Dropi usa un token de integracion (API Key), NO email/password.
-// El usuario obtiene su token desde app.dropi.co > Tiendas > Integraciones
-// Este endpoint valida que el token sea correcto haciendo una llamada de prueba a la API.
+// URLs de Dropi por pais
+const DROPI_API_URLS: Record<string, string> = {
+  AR: 'https://api.dropi.ar',
+  CO: 'https://api.dropi.co',
+  MX: 'https://api.dropi.mx',
+  CL: 'https://api.dropi.cl',
+  PE: 'https://api.dropi.pe',
+  EC: 'https://api.dropi.ec',
+  PA: 'https://api.dropi.pa',
+  PY: 'https://api.dropi.com.py',
+  ES: 'https://api.dropi.com.es',
+}
 
-const DROPI_API_BASE = 'https://api.dropi.co'
+function getDropiApiUrl(country: string): string {
+  return DROPI_API_URLS[country] || DROPI_API_URLS.AR || 'https://api.dropi.ar'
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,7 +34,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { integrationKey } = body
+    const { integrationKey, country = 'AR' } = body
 
     if (!integrationKey) {
       return NextResponse.json(
@@ -32,32 +43,43 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const apiUrl = getDropiApiUrl(country)
+
     // Validar el token haciendo una llamada de prueba a la API de Dropi
-    const testRes = await fetch(`${DROPI_API_BASE}/integrations/warehouses/`, {
-      method: 'GET',
+    const testRes = await fetch(`${apiUrl}/integrations/products/index`, {
+      method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': 'application/json;charset=UTF-8',
         'dropi-integration-key': integrationKey,
       },
+      body: JSON.stringify({ pageSize: 1, startData: 1, no_count: true }),
     })
 
-    if (!testRes.ok) {
-      const errorText = await testRes.text().catch(() => 'Sin respuesta')
-      console.error('Dropi auth validation failed:', testRes.status, errorText)
+    const testData = await testRes.json()
+
+    if (!testRes.ok || testData.status === 401) {
+      console.error('Dropi auth validation failed:', testRes.status, testData.message)
+      const domain = apiUrl.replace('https://api.', '')
       return NextResponse.json(
-        { error: 'Token de Dropi invalido. Verifica tu Integration Key en app.dropi.co' },
+        { error: `Token invalido para ${domain}. Verifica tu Integration Key en app.${domain}` },
         { status: 401 }
       )
     }
 
-    // Guardar el token en la tabla de configuracion
+    // Guardar el token y pais en la tabla de configuracion
     await db.config.upsert({
       where: { key: 'DROPI_TOKEN' },
       update: { value: integrationKey },
       create: { key: 'DROPI_TOKEN', value: integrationKey },
     })
 
-    return NextResponse.json({ success: true, token: integrationKey })
+    await db.config.upsert({
+      where: { key: 'DROPI_COUNTRY' },
+      update: { value: country },
+      create: { key: 'DROPI_COUNTRY', value: country },
+    })
+
+    return NextResponse.json({ success: true, token: integrationKey, country, apiUrl })
   } catch (error) {
     console.error('Dropi auth error:', error)
     return NextResponse.json({ error: 'Error al conectar con Dropi' }, { status: 500 })
