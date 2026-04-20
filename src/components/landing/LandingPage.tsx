@@ -97,7 +97,7 @@ const fallbackShipping = {
   express: { id: 'express', label: 'Envio Express', description: '1 a 2 dias habiles', cost: 3500, estimatedDays: '1 a 2 dias habiles', serviceType: 'express' },
 }
 
-function ProductCard({ product, onOpenDetail }: { product: Product; onOpenDetail: (p: Product) => void }) {
+function ProductCard({ product }: { product: Product }) {
   const [imgIndex, setImgIndex] = useState(0)
   const images = [product.image1, product.image2].filter(Boolean) as string[]
 
@@ -105,7 +105,7 @@ function ProductCard({ product, onOpenDetail }: { product: Product; onOpenDetail
     <motion.div variants={fadeInUp}>
       <Card
         className="group cursor-pointer overflow-hidden border-0 shadow-lg hover:shadow-2xl transition-all duration-300 bg-white"
-        onClick={() => onOpenDetail(product)}
+        onClick={() => { window.location.href = '/producto/' + product.id }}
       >
         <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-emerald-50 to-teal-50">
           {images.length > 0 ? (
@@ -145,7 +145,7 @@ function ProductCard({ product, onOpenDetail }: { product: Product; onOpenDetail
   )
 }
 
-function ComboCard({ combo, onOpenDetail }: { combo: Combo; onOpenDetail: (c: Combo) => void }) {
+function ComboCard({ combo }: { combo: Combo }) {
   const [imgIndex, setImgIndex] = useState(0)
   const images = [combo.image1, combo.image2].filter(Boolean) as string[]
   const discount = combo.originalPrice > 0 ? Math.round((1 - combo.price / combo.originalPrice) * 100) : 0
@@ -154,7 +154,7 @@ function ComboCard({ combo, onOpenDetail }: { combo: Combo; onOpenDetail: (c: Co
     <motion.div variants={fadeInUp}>
       <Card
         className="group cursor-pointer overflow-hidden border-2 border-emerald-200 shadow-lg hover:shadow-2xl transition-all duration-300 bg-white relative"
-        onClick={() => onOpenDetail(combo)}
+        onClick={() => { window.location.href = '/producto/' + combo.id + '?type=combo' }}
       >
         {discount > 0 && (
           <div className="absolute top-0 left-0 bg-red-500 text-white font-bold text-xs px-4 py-1.5 rounded-br-xl z-10">
@@ -1325,9 +1325,6 @@ function PaymentResult({ status, onDismiss }: { status: 'exitoso' | 'fallido' | 
    MAIN LANDING PAGE
    ============================== */
 export default function LandingPage({ products, combos, onGoToAdmin, paymentStatus }: LandingPageProps) {
-  const [selectedProduct, setSelectedProduct] = useState<Product | null>(null)
-  const [selectedCombo, setSelectedCombo] = useState<Combo | null>(null)
-
   // Payment result view
   if (paymentStatus) {
     return (
@@ -1412,7 +1409,7 @@ export default function LandingPage({ products, combos, onGoToAdmin, paymentStat
           {products.length > 0 ? (
             <motion.div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6" variants={stagger} initial="initial" whileInView="animate" viewport={{ once: true }}>
               {products.map((product) => (
-                <ProductCard key={product.id} product={product} onOpenDetail={setSelectedProduct} />
+                <ProductCard key={product.id} product={product} />
               ))}
             </motion.div>
           ) : (
@@ -1435,7 +1432,7 @@ export default function LandingPage({ products, combos, onGoToAdmin, paymentStat
             </motion.div>
             <motion.div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8" variants={stagger} initial="initial" whileInView="animate" viewport={{ once: true }}>
               {combos.map((combo) => (
-                <ComboCard key={combo.id} combo={combo} onOpenDetail={setSelectedCombo} />
+                <ComboCard key={combo.id} combo={combo} />
               ))}
             </motion.div>
           </div>
@@ -1474,9 +1471,6 @@ export default function LandingPage({ products, combos, onGoToAdmin, paymentStat
         </div>
       </footer>
 
-      {/* Detail Sheets */}
-      {selectedProduct && <ProductDetailSheet product={selectedProduct} open={!!selectedProduct} onClose={() => setSelectedProduct(null)} />}
-      {selectedCombo && <ComboDetailSheet combo={selectedCombo} open={!!selectedCombo} onClose={() => setSelectedCombo(null)} />}
     </div>
   )
 }
