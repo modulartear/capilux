@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://es.scribd.com/document/804372978/Integrations-Core-Dropi-2",
+    "name": "Documentación API de Integraciones Dropi | PDF | Informática - Scribd",
+    "snippet": "**Este token es permanente, no tiene vencimiento, por lo que deberá se almacenado en su. plataforma para consumir los servicios de Integrations. PRODUCTOS",
+    "host_name": "es.scribd.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=NvzsO9shLJw",
+    "name": "How to Integrate Open AI with Dropi to Generate Product Descriptions",
+    "snippet": "Crie uma conta no Dropi ➜ https://dropi.com.br/ Assine + ... API secreta 1:50 - Inserção do token no Dropi e conexão bem-sucedida ... Missing: integraciones key productos endpoint",
+    "host_name": "www.youtube.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.facebook.com/groups/n8nes/posts/1252209140288211",
+    "name": "Alguien tiene integración a través de Api con Dropi y n8n o ya la",
+    "snippet": "Este Key puede generarse de dos formas: • Si tu plataforma es publica, es decir es para uso y control de usuarios de nuestra plataforma, el ...",
+    "host_name": "www.facebook.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=hdiZlukRHCw",
+    "name": "ERROR when placing the dropi TOKEN in shopify (step  - YouTube",
+    "snippet": "... productos para testeo: https://keinerchara.com/tabla-analisis/ Calculadora de precios: https://keinerchara.com/calculadora Instagram ... Missing: integraciones key endpoint",
+    "host_name": "www.youtube.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://jina.ai/es/segmenter",
+    "name": "Segmenter API - Jina AI",
+    "snippet": "Nuestra API Segmenter es fundamental para ayudar a los LLM a gestionar la entrada dentro de los límites del contexto y optimizar el rendimiento del modelo.",
+    "host_name": "jina.ai",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://techdocs.broadcom.com/es/es/vmware-cis/vcf/vcf-9-0-and-later/9-0/how-do-i-use-a-rest-api-to-integrate-vmware-code-stream-with-other-application-0.html",
+    "name": "How do I use a REST API to integrate VCF Automation with other",
+    "snippet": "Configurar VCF Operations orchestrator · Administrar flujos de trabajo · Administrar acciones.",
+    "host_name": "techdocs.broadcom.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://usehalo.com/es/halocrm/guides/1630",
+    "name": "Guías | HALO",
+    "snippet": "You can also specify an authentication method required for the POST to this endpoint. Current methods include Basic Auth & Signature Validation via Secret Key.",
+    "host_name": "usehalo.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.mongodb.com/es/docs/api/doc/atlas-admin-api-v2/2024-10-23/group/endpoint-encryption-at-rest-using-customer-key-management",
+    "name": "Encryption at Rest using Customer Key Management - MongoDB",
+    "snippet": "Returns and edits the Encryption at Rest using Customer Key Management configuration. MongoDB Cloud encrypts all storage whether or not you use ...",
+    "host_name": "www.mongodb.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.watchguard.com/es/wgrd-news/blog/why-you-need-take-deep-layered-approach-it-security",
+    "name": "Why you need to take a deep, layered approach to IT security",
+    "snippet": "If a user can be tricked into visiting a malicious website under their control, their endpoint can quickly become infected. Of all the types of malware ...",
+    "host_name": "www.watchguard.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://sign.dropbox.com/es-ES/blog/generating-a-pdf-from-php",
+    "name": "Generating a PDF from PHP Code | Adding eSignatures - Dropbox",
+    "snippet": "In this tutorial, you'll learn all about Dropbox Sign and how you can use their official PHP SDK to create and send signable PDFs via the Dropbox Sign API.",
+    "host_name": "sign.dropbox.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

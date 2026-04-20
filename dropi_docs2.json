@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://es.scribd.com/document/804372978/Integrations-Core-Dropi-2",
+    "name": "Documentación API de Integraciones Dropi | PDF | Informática - Scribd",
+    "snippet": "**Este token es permanente, no tiene vencimiento, por lo que deberá se almacenado en su. plataforma para consumir los servicios de Integrations. PRODUCTOS",
+    "host_name": "es.scribd.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://docs.strapi.io/cms/features/api-tokens",
+    "name": "API Tokens | Strapi 5 Documentation",
+    "snippet": "API tokens allows executing a request on REST API or GraphQL API endpoints as an authenticated user. API tokens can be helpful to give access to people or ... Missing: Dropi integraciones productos",
+    "host_name": "docs.strapi.io",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://discourse.joplinapp.org/t/api-token-as-header/2815",
+    "name": "API token as header - Development - Joplin Forum",
+    "snippet": "I would like to propose the possibility to send the token via a header. Maybe this is just a personal preference, but I always thought that tokens are better ... Missing: Dropi integraciones productos",
+    "host_name": "discourse.joplinapp.org",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://es.scribd.com/document/683043719/Documentacion-de-Dropi-docx-7",
+    "name": "Documentación API de Dropi | PDF | Contraseña | Json - Scribd",
+    "snippet": "Rating 5.0 (1) El documento proporciona información sobre la integración con la plataforma Dropi, incluyendo una lista de servicios que se pueden integrar como login de ...",
+    "host_name": "es.scribd.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.freelancer.uy/job-search/aws-elasticsearch-cloudformation-template-example/2",
+    "name": "Aws elasticsearch cloudformation template exampletrabajos",
+    "snippet": "Integración de API Automatización n8n Automatización de Procesos Gestión ... API REST protegida con token para recibir los eventos. • Esquema MySQL y ...",
+    "host_name": "www.freelancer.uy",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://es.scribd.com/document/718888502/API-REST-Documentacion-Tecnica-2",
+    "name": "Documentación API REST Blue Express | PDF | Json - Scribd",
+    "snippet": "La API permite emitir una orden de servicio para Blue Express, la cual incluye información necesaria para la entrega y devuelve un número de seguimiento.",
+    "host_name": "es.scribd.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.freelancer.uy/job-search/spring-boot-oauth2-client-credentials-example/2",
+    "name": "Trabajos, empleo de Spring boot oauth2 client credentials example",
+    "snippet": "Busca trabajos relacionados con Spring boot oauth2 client credentials example o contrata en el mercado de freelancing más grande del mundo con más de 25m de ...",
+    "host_name": "www.freelancer.uy",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://soninow.com/wp/plugins/tags/woocommerce",
+    "name": "Tag: woocommerce - WordPress Debug Extension | SoniNow",
+    "snippet": "WooCommerce - PayPhone Gateway agrega una nueva pasarela de pago para realizar los cobros de tus productos de woocommerce mediante PayPhone. ... Rede API ...",
+    "host_name": "soninow.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.freelancer.uy/job-search/examples-of-python-code-for-data-analysis/5",
+    "name": "Trabajos, empleo de Examples of python code for data analysis",
+    "snippet": "- Revisar y optimizar automatizaciones existentes para recortar latencia, costes de terceros y errores silenciosos. - Documentar cada integración en español e ...",
+    "host_name": "www.freelancer.uy",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.scribd.com/document/744974973/Acuso-estandar",
+    "name": "Acuso de Estado en Línea para Órdenes de Flete | PDF - Scribd",
+    "snippet": "1. Una autentificación básica de usuario y contraseña. 2. La implementación de un token como header con el nombre x-api-key o un token Bearer, en ambos casos ...",
+    "host_name": "www.scribd.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

@@ -570,6 +570,8 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
   }
 
   // Dropi handlers
+  const [dropiDebug, setDropiDebug] = useState<{status?: number; message?: string; serverIp?: string; hint?: string} | null>(null)
+
   const handleDropiConnect = async () => {
     if (!dropiIntegrationKey.trim()) {
       setDropiError('Ingresa tu Integration Key de Dropi')
@@ -577,6 +579,7 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
     }
     setDropiConnecting(true)
     setDropiError('')
+    setDropiDebug(null)
     try {
       const res = await fetch('/api/dropi/auth', {
         method: 'POST',
@@ -587,6 +590,7 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
       if (res.ok && data.token) {
         setDropiToken(data.token)
         setDropiConnected(true)
+        setDropiDebug(null)
         // Guardar en la DB para persistir
         await fetch('/api/config', {
           method: 'PUT',
@@ -594,7 +598,10 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
           body: JSON.stringify({ configs: { DROPI_TOKEN: data.token } }),
         })
       } else {
-        setDropiError(data.error || 'Token invalido. Verifica tu Integration Key en app.dropi.co')
+        setDropiError(data.error || 'Token invalido. Verifica tu Integration Key')
+        if (data.debug) {
+          setDropiDebug(data.debug)
+        }
       }
     } catch {
       setDropiError('Error de conexion con Dropi')
@@ -1178,7 +1185,27 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
                     <p className="text-xs text-gray-400">
                       Encontra tu Integration Key en: app.<b>{dropiCountry === 'AR' ? 'dropi.ar' : dropiCountry === 'CO' ? 'dropi.co' : 'dropi.' + dropiCountry.toLowerCase()}</b> {'>'} Tiendas {'>'} tu tienda {'>'} Token de integracion
                     </p>
-                    {dropiError && <p className="text-red-500 text-sm bg-red-50 p-3 rounded-lg">{dropiError}</p>}
+                    {dropiError && (
+                      <div className="bg-red-50 border border-red-200 rounded-lg p-3 space-y-2">
+                        <p className="text-red-600 text-sm font-medium">{dropiError}</p>
+                        {dropiDebug && (
+                          <div className="text-xs text-red-400 space-y-1">
+                            <p>Estado: {dropiDebug.status} | Mensaje Dropi: {dropiDebug.message}</p>
+                            {dropiDebug.serverIp && <p>IP del servidor: {dropiDebug.serverIp}</p>}
+                            {dropiDebug.hint && <p className="text-amber-500 italic">{dropiDebug.hint}</p>}
+                          </div>
+                        )}
+                        <div className="text-xs text-gray-500 pt-1 border-t border-red-100">
+                          <p className="font-medium text-gray-600 mb-1">Posibles soluciones:</p>
+                          <ul className="list-disc list-inside space-y-0.5">
+                            <li>Asegurate de copiar el token completo desde {dropiCountry === 'AR' ? 'app.dropi.ar' : 'app.dropi.co'}</li>
+                            <li>Ve a <b>Tiendas</b> {'>'} tu tienda {'>'} <b>Token de integracion</b></li>
+                            <li>El token es largo y alfanumerico - no lo recortes</li>
+                            <li>Si el problema persiste, contacta a soporte de Dropi</li>
+                          </ul>
+                        </div>
+                      </div>
+                    )}
                     <Button onClick={handleDropiConnect} disabled={dropiConnecting || !dropiIntegrationKey.trim()} className="bg-violet-600 hover:bg-violet-700 gap-2">
                       {dropiConnecting && <Loader2 className="w-4 h-4 animate-spin" />}
                       {dropiConnecting ? 'Validando...' : 'Conectar con Dropi'}
