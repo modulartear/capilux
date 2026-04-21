@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
@@ -38,7 +38,13 @@ interface ProductData {
   originalPrice?: number
 }
 
-interface UpsellRecommendation extends ProductData {
+interface UpsellRecommendation {
+  id: string
+  name: string
+  description: string
+  price: number
+  image1: string | null
+  image2: string | null
   type: string
   reason: string
 }
@@ -129,7 +135,6 @@ export default function ProductPage() {
   const searchParams = useSearchParams()
   const id = params.id as string
   const type = searchParams.get('type') || 'product'
-  const upsellRef = useRef<HTMLDivElement>(null)
 
   const { addItem } = useCart()
   const [item, setItem] = useState<ProductData | null>(null)
@@ -144,6 +149,7 @@ export default function ProductPage() {
   const [upsellRecs, setUpsellRecs] = useState<UpsellRecommendation[]>([])
   const [upsellLoading, setUpsellLoading] = useState(false)
   const [upsellFetched, setUpsellFetched] = useState(false)
+  const fetchUpsellRef = useRef<() => void>(() => {})
 
   // Fetch product data
   useEffect(() => {
@@ -171,24 +177,9 @@ export default function ProductPage() {
     } catch { /* ignore */ }
   }, [id])
 
-  // Fetch upsell recommendations
-  useEffect(() => {
-    if (!item || upsellFetched) return
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && !upsellFetched) {
-          setUpsellFetched(true)
-          fetchUpsell()
-        }
-      },
-      { threshold: 0.1 }
-    )
-    const currentRef = upsellRef.current
-    if (currentRef) observer.observe(currentRef)
-    return () => { if (currentRef) observer.unobserve(currentRef) }
-  }, [item, upsellFetched])
-
-  const fetchUpsell = async () => {
+  // Fetch upsell recommendations - trigger immediately when item loads
+  const fetchUpsell = useCallback(async () => {
+    if (!item) return
     const cacheKey = `upsell-${id}-${type}`
     const cached = sessionStorage.getItem(cacheKey)
     if (cached) {
@@ -196,45 +187,93 @@ export default function ProductPage() {
         const parsed = JSON.parse(cached)
         if (Array.isArray(parsed) && parsed.length > 0) {
           setUpsellRecs(parsed)
+          setUpsellFetched(true)
           return
         }
-      } catch { /* ignore */ }
+      } catch { /* ignore bad cache */ }
     }
     try {
       setUpsellLoading(true)
       const res = await fetch(`/api/products/${id}?type=${type}`)
-      if (!res.ok) return
+      if (!res.ok) throw new Error('Failed to fetch products')
       const data = await res.json()
-      const otherItems = data.otherItems || []
-      if (otherItems.length === 0) return
-      const currentProduct = {
-        id: item!.id,
-        name: item!.name,
-        description: item!.description,
-        price: item!.price,
-        ...(item!.items && { items: item!.items }),
-        ...(item!.originalPrice && { originalPrice: item!.originalPrice }),
+      const otherItems: Array<ProductData & { _type?: string; items?: string; originalPrice?: number }> = data.otherItems || []
+      if (otherItems.length === 0) {
+        setUpsellFetched(true)
+        return
       }
-      const availableProducts = otherItems.map((p: ProductData & { _type?: string }, i: number) => ({
+      const currentProduct = {
+        id: item.id,
+        name: item.name,
+        description: item.description,
+        price: item.price,
+        ...(item.items && { items: item.items }),
+        ...(item.originalPrice && { originalPrice: item.originalPrice }),
+      }
+      const availableProducts = otherItems.map((p) => ({
         ...p,
         _type: p.id.startsWith('cm') ? 'combo' : 'product',
       }))
-      const upsellRes = await fetch('/api/ai/upsell', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ currentProduct, availableProducts }),
-      })
-      if (!upsellRes.ok) return
-      const upsellData = await upsellRes.json()
-      const recs = upsellData.recommendations || []
+
+      // Try AI upsell
+      let recs: UpsellRecommendation[] = []
+      try {
+        const upsellRes = await fetch('/api/ai/upsell', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ currentProduct, availableProducts }),
+        })
+        if (upsellRes.ok) {
+          const upsellData = await upsellRes.json()
+          recs = upsellData.recommendations || []
+        }
+      } catch (e) {
+        console.warn('AI upsell failed, using fallback:', e)
+      }
+
+      // Fallback: if AI returned nothing, pick random products from catalog
+      if (recs.length === 0) {
+        const shuffled = [...availableProducts].sort(() => Math.random() - 0.5)
+        const fallbackReasons = [
+          'Un excelente complemento para tu compra.',
+          'Ideal para potenciar tus resultados.',
+          'Perfecto para combinar con este producto.',
+          'Nuestros clientes lo eligen junto a este item.',
+        ]
+        recs = shuffled.slice(0, 4).map((p, i) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description,
+          price: p.price,
+          image1: p.image1 || null,
+          image2: p.image2 || null,
+          items: p.items || null,
+          originalPrice: p.originalPrice || null,
+          type: (p._type || 'product') as string,
+          reason: fallbackReasons[i % fallbackReasons.length],
+        }))
+      }
+
       if (recs.length > 0) {
         setUpsellRecs(recs)
         sessionStorage.setItem(cacheKey, JSON.stringify(recs))
       }
-    } catch { /* silent */ } finally {
+    } catch (e) {
+      console.error('Upsell error:', e)
+    } finally {
       setUpsellLoading(false)
+      setUpsellFetched(true)
     }
-  }
+  }, [item, id, type])
+
+  fetchUpsellRef.current = fetchUpsell
+
+  // Trigger upsell fetch when item is loaded
+  useEffect(() => {
+    if (item && !upsellFetched) {
+      fetchUpsellRef.current()
+    }
+  }, [item, upsellFetched])
 
   const toggleFavorite = () => {
     try {
@@ -629,7 +668,7 @@ export default function ProductPage() {
         </div>
 
         {/* AI UPSELL SECTION */}
-        <div ref={upsellRef} className="mt-16">
+        <div className="mt-16">
           <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 border border-emerald-100 p-6 sm:p-8">
             <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-200/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-teal-200/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
@@ -703,7 +742,7 @@ export default function ProductPage() {
                     )
                   })}
                 </div>
-              ) : upsellFetched ? null : (
+              ) : upsellFetched && upsellRecs.length === 0 ? null : (
                 <div className="text-center py-8 text-gray-400 text-sm">Cargando recomendaciones...</div>
               )}
             </div>
