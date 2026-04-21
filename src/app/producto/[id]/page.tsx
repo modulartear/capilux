@@ -24,6 +24,8 @@ import {
   ArrowRight,
   ShoppingCart,
 } from 'lucide-react'
+import { useCart } from '@/context/CartContext'
+import { CartSheet } from '@/components/cart/CartSheet'
 
 interface ProductData {
   id: string
@@ -129,6 +131,7 @@ export default function ProductPage() {
   const type = searchParams.get('type') || 'product'
   const upsellRef = useRef<HTMLDivElement>(null)
 
+  const { addItem } = useCart()
   const [item, setItem] = useState<ProductData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -248,6 +251,13 @@ export default function ProductPage() {
   }
 
   const handleAddToCart = () => {
+    addItem({
+      id: item!.id,
+      name: item!.name,
+      price: item!.price,
+      image: item!.image1,
+      type: type === 'combo' ? 'combo' : 'product',
+    })
     setAddedToCart(true)
     setTimeout(() => setAddedToCart(false), 2000)
   }
@@ -318,7 +328,8 @@ export default function ProductPage() {
             <ChevronLeft className="w-4 h-4" />
             Volver
           </button>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <CartSheet />
             <button
               onClick={toggleFavorite}
               className="p-2 rounded-full hover:bg-gray-100 transition-colors"

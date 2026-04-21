@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { CartProvider } from '@/context/CartContext'
 
 interface Product {
   id: string
@@ -103,17 +102,15 @@ export default function Home() {
 
   if (view === 'landing' && LandingPage) {
     return (
-      <CartProvider>
-        <LandingPage
-          products={products}
-          combos={combos}
-          onGoToAdmin={() => {
-            window.location.hash = '#dashboard'
-            setView('dashboard')
-          }}
-          paymentStatus={paymentStatus}
-        />
-      </CartProvider>
+      <LandingPage
+        products={products}
+        combos={combos}
+        onGoToAdmin={() => {
+          window.location.hash = '#dashboard'
+          setView('dashboard')
+        }}
+        paymentStatus={paymentStatus}
+      />
     )
   }
 
