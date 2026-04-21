@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -17,7 +17,11 @@ import {
   CircleCheckBig,
   CircleX,
   CircleAlert,
+  ShoppingCart,
+  Plus,
 } from 'lucide-react'
+import { useCart } from '@/context/CartContext'
+import { CartSheet } from '@/components/cart/CartSheet'
 
 interface Product {
   id: string
@@ -62,7 +66,22 @@ const stagger = {
 
 function ProductCard({ product }: { product: Product }) {
   const [imgIndex, setImgIndex] = useState(0)
+  const [addedToCart, setAddedToCart] = useState(false)
   const images = [product.image1, product.image2].filter(Boolean) as string[]
+  const { addItem } = useCart()
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    addItem({
+      id: product.id,
+      name: product.name,
+      price: product.price,
+      image: product.image1,
+      type: 'product',
+    })
+    setAddedToCart(true)
+    setTimeout(() => setAddedToCart(false), 1500)
+  }
 
   return (
     <motion.div variants={fadeInUp}>
@@ -98,10 +117,37 @@ function ProductCard({ product }: { product: Product }) {
           <Badge className="absolute top-3 right-3 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold px-3 py-1">
             ${product.price.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
           </Badge>
+          {/* Add to cart button overlay */}
+          <div className="absolute bottom-3 left-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={handleAddToCart}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold shadow-lg transition-all ${
+                addedToCart
+                  ? 'bg-emerald-600 text-white'
+                  : 'bg-white text-emerald-700 hover:bg-emerald-50 border border-emerald-200'
+              }`}
+            >
+              <ShoppingCart className="w-3.5 h-3.5" />
+              {addedToCart ? 'Agregado!' : 'Agregar'}
+            </motion.button>
+          </div>
         </div>
         <CardContent className="p-5">
           <h3 className="font-bold text-lg text-gray-800 mb-2">{product.name}</h3>
           <p className="text-gray-500 text-sm line-clamp-2">{product.description}</p>
+          {/* Mobile add to cart button */}
+          <button
+            onClick={handleAddToCart}
+            className={`mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all md:hidden ${
+              addedToCart
+                ? 'bg-emerald-100 text-emerald-700 border border-emerald-200'
+                : 'bg-emerald-50 text-emerald-700 border border-emerald-200 hover:bg-emerald-100'
+            }`}
+          >
+            <Plus className="w-4 h-4" />
+            {addedToCart ? 'Agregado al carrito' : 'Agregar al carrito'}
+          </button>
         </CardContent>
       </Card>
     </motion.div>
@@ -110,8 +156,23 @@ function ProductCard({ product }: { product: Product }) {
 
 function ComboCard({ combo }: { combo: Combo }) {
   const [imgIndex, setImgIndex] = useState(0)
+  const [addedToCart, setAddedToCart] = useState(false)
   const images = [combo.image1, combo.image2].filter(Boolean) as string[]
   const discount = combo.originalPrice > 0 ? Math.round((1 - combo.price / combo.originalPrice) * 100) : 0
+  const { addItem } = useCart()
+
+  const handleAddToCart = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    addItem({
+      id: combo.id,
+      name: combo.name,
+      price: combo.price,
+      image: combo.image1,
+      type: 'combo',
+    })
+    setAddedToCart(true)
+    setTimeout(() => setAddedToCart(false), 1500)
+  }
 
   return (
     <motion.div variants={fadeInUp}>
@@ -149,6 +210,21 @@ function ComboCard({ combo }: { combo: Combo }) {
               <Star className="w-16 h-16" />
             </div>
           )}
+          {/* Add to cart button overlay */}
+          <div className="absolute bottom-3 left-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+            <motion.button
+              whileTap={{ scale: 0.9 }}
+              onClick={handleAddToCart}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-full text-xs font-semibold shadow-lg transition-all ${
+                addedToCart
+                  ? 'bg-amber-600 text-white'
+                  : 'bg-white text-amber-700 hover:bg-amber-50 border border-amber-200'
+              }`}
+            >
+              <ShoppingCart className="w-3.5 h-3.5" />
+              {addedToCart ? 'Agregado!' : 'Agregar'}
+            </motion.button>
+          </div>
         </div>
         <CardContent className="p-5">
           <div className="flex items-center gap-2 mb-2">
@@ -162,6 +238,18 @@ function ComboCard({ combo }: { combo: Combo }) {
               <span className="text-sm text-gray-400 line-through">${combo.originalPrice.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</span>
             )}
           </div>
+          {/* Mobile add to cart button */}
+          <button
+            onClick={handleAddToCart}
+            className={`mt-3 w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold transition-all md:hidden ${
+              addedToCart
+                ? 'bg-amber-100 text-amber-700 border border-amber-200'
+                : 'bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100'
+            }`}
+          >
+            <Plus className="w-4 h-4" />
+            {addedToCart ? 'Agregado al carrito' : 'Agregar al carrito'}
+          </button>
         </CardContent>
       </Card>
     </motion.div>
@@ -269,7 +357,10 @@ export default function LandingPage({ products, combos, onGoToAdmin, paymentStat
               <a href="#productos" className="text-gray-600 hover:text-emerald-600 transition-colors font-medium">Productos</a>
               <a href="#combos" className="text-gray-600 hover:text-emerald-600 transition-colors font-medium">Combos</a>
             </div>
-            <Button variant="ghost" size="sm" onClick={onGoToAdmin} className="text-gray-400 hover:text-emerald-600 text-xs">Admin</Button>
+            <div className="flex items-center gap-1">
+              <CartSheet />
+              <Button variant="ghost" size="sm" onClick={onGoToAdmin} className="text-gray-400 hover:text-emerald-600 text-xs">Admin</Button>
+            </div>
           </div>
         </div>
       </nav>
