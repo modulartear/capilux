@@ -263,7 +263,8 @@ export default function ProductPage() {
   }
 
   const handleBuyNow = () => {
-    window.location.href = `/checkout/${id}${type === 'combo' ? '?type=combo' : ''}&qty=${quantity}`
+    const query = type === 'combo' ? `?type=combo&qty=${quantity}` : `?qty=${quantity}`
+    window.location.href = `/checkout/${id}${query}`
   }
 
   const unitPrice = item?.price || 0

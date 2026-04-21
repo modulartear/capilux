@@ -188,7 +188,8 @@ export function CartSheet() {
                   className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl gap-2 shadow-lg shadow-emerald-600/20"
                   onClick={() => {
                     const item = items[0]
-                    window.location.href = `/checkout/${item.id}${item.type === 'combo' ? '?type=combo' : ''}&qty=${item.quantity}`
+                    const query = item.type === 'combo' ? `?type=combo&qty=${item.quantity}` : `?qty=${item.quantity}`
+                    window.location.href = `/checkout/${item.id}${query}`
                   }}
                 >
                   Comprar ahora
@@ -201,7 +202,8 @@ export function CartSheet() {
                   onClick={() => {
                     // Go to checkout with first item (multi-item checkout could be added later)
                     const item = items[0]
-                    window.location.href = `/checkout/${item.id}${item.type === 'combo' ? '?type=combo' : ''}&qty=${item.quantity}`
+                    const query = item.type === 'combo' ? `?type=combo&qty=${item.quantity}` : `?qty=${item.quantity}`
+                    window.location.href = `/checkout/${item.id}${query}`
                   }}
                 >
                   Iniciar compra
