@@ -1,36 +1,29 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
   Star,
-  Shield,
   Heart,
   Minus,
   Plus,
   Package,
+  Shield,
   RotateCcw,
   CreditCard,
-  MessageCircle,
   Share2,
-  Loader2,
   ChevronLeft,
+  ChevronDown,
+  Truck,
   Sparkles,
   ArrowRight,
+  ShoppingCart,
 } from 'lucide-react'
-import {
-  BuyerForm,
-  ShippingAddressForm,
-  ShippingSelector,
-  handleMercadoPago,
-  fallbackShipping,
-  type ShippingOption,
-} from '@/components/checkout/CheckoutForms'
 
 interface ProductData {
   id: string
@@ -48,6 +41,87 @@ interface UpsellRecommendation extends ProductData {
   reason: string
 }
 
+/* ==============================
+   FREE SHIPPING BAR
+   ============================== */
+const FREE_SHIPPING_THRESHOLD = 50000
+
+function FreeShippingBar({ currentTotal }: { currentTotal: number }) {
+  const progress = Math.min((currentTotal / FREE_SHIPPING_THRESHOLD) * 100, 100)
+  const remaining = Math.max(FREE_SHIPPING_THRESHOLD - currentTotal, 0)
+  const reached = currentTotal >= FREE_SHIPPING_THRESHOLD
+
+  return (
+    <div className="bg-gradient-to-r from-emerald-50 to-teal-50 rounded-xl p-4 border border-emerald-100">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Truck className="w-4 h-4 text-emerald-600" />
+          <span className="text-sm font-semibold text-gray-800">
+            {reached ? 'Tenes envio gratis!' : `Envio gratis desde $${FREE_SHIPPING_THRESHOLD.toLocaleString('es-AR')}`}
+          </span>
+        </div>
+        {!reached && (
+          <span className="text-xs text-gray-500">
+            Te faltan <span className="font-semibold text-emerald-600">${remaining.toLocaleString('es-AR')}</span>
+          </span>
+        )}
+      </div>
+      <div className="w-full h-2.5 bg-white rounded-full overflow-hidden">
+        <motion.div
+          className="h-full bg-gradient-to-r from-emerald-400 to-teal-400 rounded-full"
+          initial={{ width: 0 }}
+          animate={{ width: `${progress}%` }}
+          transition={{ duration: 0.8, ease: 'easeOut' }}
+        />
+      </div>
+      {reached && (
+        <p className="text-xs text-emerald-600 mt-1.5 font-medium">Tu pedido califica para envio sin cargo</p>
+      )}
+    </div>
+  )
+}
+
+/* ==============================
+   ACCORDION SECTION
+   ============================== */
+function AccordionItem({
+  title,
+  children,
+  defaultOpen = false,
+}: {
+  title: string
+  children: React.ReactNode
+  defaultOpen?: boolean
+}) {
+  const [open, setOpen] = useState(defaultOpen)
+  return (
+    <div className="border border-gray-200 rounded-xl overflow-hidden">
+      <button
+        onClick={() => setOpen(!open)}
+        className="w-full flex items-center justify-between px-5 py-4 bg-gray-50 hover:bg-gray-100 transition-colors"
+      >
+        <span className="font-semibold text-gray-800 text-sm">{title}</span>
+        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            className="overflow-hidden"
+          >
+            <div className="px-5 py-4 text-sm text-gray-600 leading-relaxed">
+              {children}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  )
+}
+
 export default function ProductPage() {
   const params = useParams()
   const searchParams = useSearchParams()
@@ -58,28 +132,10 @@ export default function ProductPage() {
   const [item, setItem] = useState<ProductData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-
-  // Form state
   const [mainImage, setMainImage] = useState(0)
   const [quantity, setQuantity] = useState(1)
-  const [buyerName, setBuyerName] = useState('')
-  const [buyerEmail, setBuyerEmail] = useState('')
-  const [buyerPhone, setBuyerPhone] = useState('')
-  const [buyerDni, setBuyerDni] = useState('')
-  const [payLoading, setPayLoading] = useState(false)
-  const [payError, setPayError] = useState('')
-  const [postalCode, setPostalCode] = useState('')
-  const [province, setProvince] = useState('')
-  const [city, setCity] = useState('')
-  const [street, setStreet] = useState('')
-  const [number, setNumber] = useState('')
-  const [floor, setFloor] = useState('')
-  const [provinces, setProvinces] = useState<Array<{ code: string; name: string }>>([])
-  const [andreaniOptions, setAndreaniOptions] = useState<ShippingOption[]>([])
-  const [selectedShippingId, setSelectedShippingId] = useState('standard')
-  const [andreaniConfigured, setAndreaniConfigured] = useState(false)
-  const [quoting, setQuoting] = useState(false)
-  const [quoteError, setQuoteError] = useState('')
+  const [isFavorite, setIsFavorite] = useState(false)
+  const [addedToCart, setAddedToCart] = useState(false)
 
   // Upsell state
   const [upsellRecs, setUpsellRecs] = useState<UpsellRecommendation[]>([])
@@ -104,18 +160,17 @@ export default function ProductPage() {
     if (id) fetchData()
   }, [id, type])
 
-  // Fetch provinces
+  // Check favorites
   useEffect(() => {
-    fetch('/api/shipping/provinces')
-      .then(res => res.json())
-      .then(data => { if (Array.isArray(data)) setProvinces(data) })
-      .catch(() => {})
-  }, [])
+    try {
+      const favs = JSON.parse(localStorage.getItem('capilux_favorites') || '[]')
+      setIsFavorite(favs.includes(id))
+    } catch { /* ignore */ }
+  }, [id])
 
-  // Fetch upsell recommendations (only once, using IntersectionObserver)
+  // Fetch upsell recommendations
   useEffect(() => {
     if (!item || upsellFetched) return
-
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting && !upsellFetched) {
@@ -125,17 +180,12 @@ export default function ProductPage() {
       },
       { threshold: 0.1 }
     )
-
     const currentRef = upsellRef.current
     if (currentRef) observer.observe(currentRef)
-
-    return () => {
-      if (currentRef) observer.unobserve(currentRef)
-    }
+    return () => { if (currentRef) observer.unobserve(currentRef) }
   }, [item, upsellFetched])
 
   const fetchUpsell = async () => {
-    // Check sessionStorage cache first
     const cacheKey = `upsell-${id}-${type}`
     const cached = sessionStorage.getItem(cacheKey)
     if (cached) {
@@ -147,18 +197,13 @@ export default function ProductPage() {
         }
       } catch { /* ignore */ }
     }
-
     try {
       setUpsellLoading(true)
-      // Fetch other items from the API
       const res = await fetch(`/api/products/${id}?type=${type}`)
       if (!res.ok) return
       const data = await res.json()
       const otherItems = data.otherItems || []
-
       if (otherItems.length === 0) return
-
-      // Build the request body for AI
       const currentProduct = {
         id: item!.id,
         name: item!.name,
@@ -167,12 +212,10 @@ export default function ProductPage() {
         ...(item!.items && { items: item!.items }),
         ...(item!.originalPrice && { originalPrice: item!.originalPrice }),
       }
-
       const availableProducts = otherItems.map((p: ProductData & { _type?: string }, i: number) => ({
         ...p,
         _type: p.id.startsWith('cm') ? 'combo' : 'product',
       }))
-
       const upsellRes = await fetch('/api/ai/upsell', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -185,124 +228,43 @@ export default function ProductPage() {
         setUpsellRecs(recs)
         sessionStorage.setItem(cacheKey, JSON.stringify(recs))
       }
-    } catch {
-      // Silently fail - upsell is optional
-    } finally {
+    } catch { /* silent */ } finally {
       setUpsellLoading(false)
     }
   }
 
-  const fetchShippingQuote = useCallback(async (cp: string) => {
-    if (!cp || cp.length < 4) return
-    setQuoting(true)
-    setQuoteError('')
+  const toggleFavorite = () => {
     try {
-      const res = await fetch('/api/shipping/quote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postalCode: cp, weight: 0.5, dimensions: { length: 25, width: 15, height: 10 } }),
-      })
-      const data = await res.json()
-      if (data.configured && Array.isArray(data.options) && data.options.length > 0) {
-        setAndreaniOptions(data.options)
-        setAndreaniConfigured(true)
-        setSelectedShippingId(data.options[0].id)
+      const favs = JSON.parse(localStorage.getItem('capilux_favorites') || '[]')
+      if (isFavorite) {
+        const idx = favs.indexOf(id)
+        if (idx > -1) favs.splice(idx, 1)
       } else {
-        setAndreaniConfigured(false)
-        setQuoteError(data.error || 'No se pudo obtener la cotizacion. Se usara tarifa estandar.')
+        favs.push(id)
       }
-    } catch {
-      setQuoteError('Error de conexion. Se usara tarifa estandar.')
-      setAndreaniConfigured(false)
-    } finally {
-      setQuoting(false)
-    }
-  }, [])
+      localStorage.setItem('capilux_favorites', JSON.stringify(favs))
+      setIsFavorite(!isFavorite)
+    } catch { /* ignore */ }
+  }
+
+  const handleAddToCart = () => {
+    setAddedToCart(true)
+    setTimeout(() => setAddedToCart(false), 2000)
+  }
+
+  const handleBuyNow = () => {
+    window.location.href = `/checkout/${id}${type === 'combo' ? '?type=combo' : ''}&qty=${quantity}`
+  }
 
   const unitPrice = item?.price || 0
-  const activeOptions = andreaniConfigured && andreaniOptions.length > 0 ? andreaniOptions : [fallbackShipping.standard, fallbackShipping.express]
-  const selectedOption = activeOptions.find(o => o.id === selectedShippingId) || activeOptions[0]
-  const shippingCost = selectedOption.cost
-  const shippingLabel = selectedOption.label
-  const totalPrice = unitPrice * quantity + shippingCost
-  const discount = type === 'combo' && item && 'originalPrice' in item && item.originalPrice ? Math.round((1 - item.price / item.originalPrice) * 100) : 0
-
-  const onMP = async () => {
-    if (!buyerName || !buyerEmail) {
-      setPayError('Completa nombre y email para continuar')
-      return
-    }
-    if (!postalCode) {
-      setPayError('Ingresa tu codigo postal para el envio')
-      return
-    }
-    setPayError('')
-    setPayLoading(true)
-    try {
-      const totalAmount = unitPrice * quantity + shippingCost
-      const orderRes = await fetch('/api/orders', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          itemType: type === 'combo' ? 'combo' : 'product',
-          itemId: item!.id,
-          itemName: item!.name,
-          itemPrice: unitPrice,
-          quantity,
-          subtotal: unitPrice * quantity,
-          buyerName,
-          buyerEmail,
-          buyerPhone,
-          buyerDni,
-          shippingMethod: selectedOption.label,
-          shippingCost,
-          shippingAddress: { postalCode, province, city, street, number, floor },
-          total: totalAmount,
-        }),
-      })
-      const orderData = await orderRes.json()
-      const savedOrderId = orderData.orderId || ''
-
-      await handleMercadoPago({
-        title: item!.name,
-        description: item!.description,
-        price: unitPrice,
-        quantity,
-        shippingCost,
-        shippingLabel,
-        buyerName,
-        buyerEmail,
-        buyerPhone,
-        buyerDni,
-        itemType: type === 'combo' ? 'combo' : 'product',
-        itemId: item!.id,
-        shippingAddress: { postalCode, province, city, street, number, floor },
-        shippingMethod: selectedOption.label,
-        orderId: savedOrderId,
-      })
-    } catch (e: unknown) {
-      setPayError(e instanceof Error ? e.message : 'Error al procesar el pago')
-    } finally {
-      setPayLoading(false)
-    }
-  }
-
-  const handleWhatsApp = () => {
-    const addrStr = street ? `${street} ${number}, ${city}, ${province} (CP: ${postalCode})` : postalCode
-    const itemLabel = type === 'combo' ? 'combo' : 'producto'
-    const msg = encodeURIComponent(
-      `Hola! Me interesa el ${itemLabel}: ${item?.name}\nCantidad: ${quantity}\nEnvio a: ${addrStr}\nTotal estimado: $${totalPrice.toLocaleString('es-AR')}`
-    )
-    window.open(`https://wa.me/?text=${msg}`, '_blank')
-  }
-
+  const discount = type === 'combo' && item && item.originalPrice ? Math.round((1 - item.price / item.originalPrice) * 100) : 0
   const images = item ? [item.image1, item.image2].filter(Boolean) as string[] : []
 
   // Loading state
   if (loading) {
     return (
       <div className="min-h-screen bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
           <Skeleton className="w-32 h-8 mb-8" />
           <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
             <div>
@@ -317,7 +279,6 @@ export default function ProductPage() {
               <Skeleton className="h-8 w-1/4" />
               <Skeleton className="h-32 w-full" />
               <Skeleton className="h-48 w-full" />
-              <Skeleton className="h-32 w-full" />
             </div>
           </div>
         </div>
@@ -342,11 +303,14 @@ export default function ProductPage() {
     )
   }
 
+  // Generate product details from description for accordion
+  const descriptionParts = item.description.split(/[.\n]/).filter(Boolean)
+
   return (
     <div className="min-h-screen bg-white">
       {/* Top Bar */}
       <div className="sticky top-0 z-30 bg-white/95 backdrop-blur-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 flex items-center justify-between">
           <button
             onClick={() => window.location.href = '/'}
             className="flex items-center gap-2 text-gray-600 hover:text-emerald-600 transition-colors font-medium text-sm"
@@ -354,22 +318,42 @@ export default function ProductPage() {
             <ChevronLeft className="w-4 h-4" />
             Volver
           </button>
-          <button
-            onClick={() => { if (navigator.share) navigator.share({ title: item.name, text: item.description, url: window.location.href }) }}
-            className="p-2 rounded-full hover:bg-gray-100 transition-colors"
-          >
-            <Share2 className="w-5 h-5 text-gray-500" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={toggleFavorite}
+              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            >
+              <Heart className={`w-5 h-5 transition-colors ${isFavorite ? 'fill-red-500 text-red-500' : 'text-gray-400'}`} />
+            </button>
+            <button
+              onClick={() => { if (navigator.share) navigator.share({ title: item.name, text: item.description, url: window.location.href }) }}
+              className="p-2 rounded-full hover:bg-gray-100 transition-colors"
+            >
+              <Share2 className="w-5 h-5 text-gray-400" />
+            </button>
+          </div>
         </div>
       </div>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 pb-16">
+      <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6 pb-16">
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-2 text-sm text-gray-400 mb-6">
+          <Link href="/" className="hover:text-emerald-600 transition-colors">Inicio</Link>
+          <span>/</span>
+          {type === 'combo' ? (
+            <span className="text-emerald-600 font-medium">Combos</span>
+          ) : (
+            <span className="text-emerald-600 font-medium">Productos</span>
+          )}
+          <span>/</span>
+          <span className="text-gray-700 font-medium truncate max-w-[200px]">{item.name}</span>
+        </nav>
+
         <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
-          {/* LEFT COLUMN: Images & Description */}
+          {/* LEFT COLUMN: Images */}
           <div>
-            {/* Image Gallery */}
             <div className="space-y-3">
-              <div className="relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-emerald-50 to-teal-50">
+              <div className="relative aspect-square rounded-2xl overflow-hidden bg-gradient-to-br from-emerald-50 to-teal-50 border border-gray-100">
                 {images.length > 0 ? (
                   <AnimatePresence mode="wait">
                     <motion.img
@@ -407,7 +391,7 @@ export default function ProductPage() {
                       onClick={() => setMainImage(i)}
                       className={`relative flex-1 aspect-[4/3] rounded-xl overflow-hidden border-2 transition-all duration-200 ${
                         i === mainImage
-                          ? 'border-emerald-600 ring-2 ring-emerald-600/20 shadow-md'
+                          ? 'border-emerald-500 ring-2 ring-emerald-500/20 shadow-md'
                           : 'border-gray-200 hover:border-gray-300 opacity-70 hover:opacity-100'
                       }`}
                     >
@@ -417,218 +401,216 @@ export default function ProductPage() {
                 </div>
               )}
             </div>
+          </div>
 
-            {/* Product Info - visible on mobile (below images) */}
-            <div className="mt-6 space-y-4 lg:hidden">
+          {/* RIGHT COLUMN: Product Info & Actions */}
+          <div>
+            <div className="lg:sticky lg:top-16 space-y-5">
+              {/* Title */}
               <div>
-                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">{item.name}</h1>
-                <div className="flex items-end gap-3 mt-2">
-                  <span className="text-3xl font-extrabold text-emerald-600">
+                {type === 'combo' && (
+                  <Badge className="bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold mb-3">COMBO</Badge>
+                )}
+                <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight uppercase tracking-tight">
+                  {item.name}
+                </h1>
+              </div>
+
+              {/* Price */}
+              <div className="space-y-1">
+                <div className="flex items-end gap-3">
+                  <span className="text-3xl font-extrabold text-gray-900">
                     ${unitPrice.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
                   </span>
                   {type === 'combo' && item.originalPrice && item.originalPrice > 0 && (
-                    <span className="text-base text-gray-400 line-through mb-0.5">
+                    <span className="text-base text-gray-400 line-through mb-1">
                       ${item.originalPrice.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
                     </span>
                   )}
-                  <span className="text-sm text-gray-400 mb-1">cada uno</span>
                 </div>
+                {type === 'combo' && item.originalPrice && item.originalPrice > 0 && (
+                  <p className="text-xs text-gray-400">
+                    Precio original: ${item.originalPrice.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
+                  </p>
+                )}
               </div>
-              <div className="flex items-center gap-2">
+
+              {/* Rating & Stock */}
+              <div className="flex items-center gap-3">
                 <div className="flex gap-0.5">
                   {[1, 2, 3, 4, 5].map((s) => (
                     <Star key={s} className={`w-4 h-4 ${s <= 4 ? 'fill-amber-400 text-amber-400' : 'fill-gray-200 text-gray-200'}`} />
                   ))}
                 </div>
                 <span className="text-sm text-gray-400">(4.0)</span>
-                <Separator orientation="vertical" className="h-4" />
-                <span className="text-sm text-emerald-600 font-medium">En stock</span>
-              </div>
-              <div>
-                <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide mb-2">Descripcion</h3>
-                <p className="text-gray-600 leading-relaxed">{item.description}</p>
-              </div>
-              {type === 'combo' && item.items && (
-                <div>
-                  <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide mb-2">Incluye</h3>
-                  <p className="text-gray-600 leading-relaxed">{item.items}</p>
-                </div>
-              )}
-            </div>
-
-            {/* Trust Features */}
-            <div className="mt-6 grid grid-cols-2 gap-3">
-              {[
-                { icon: Shield, label: 'Compra segura', desc: 'Datos protegidos' },
-                { icon: RotateCcw, label: 'Devoluciones', desc: '30 dias para devolver' },
-                { icon: Package, label: 'Envio original', desc: 'Producto sellado' },
-                { icon: CreditCard, label: 'Todos los medios', desc: 'MP / transferencia' },
-              ].map((trustItem, i) => (
-                <div key={i} className="flex items-center gap-2.5 p-3 rounded-lg bg-gray-50">
-                  <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
-                    <trustItem.icon className="w-4 h-4 text-emerald-600" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-xs font-semibold text-gray-700">{trustItem.label}</p>
-                    <p className="text-[10px] text-gray-400 truncate">{trustItem.desc}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* RIGHT COLUMN: Purchase Form */}
-          <div>
-            {/* Sticky purchase form on desktop */}
-            <div className="lg:sticky lg:top-16 lg:max-h-[calc(100vh-5rem)] lg:overflow-y-auto lg:pb-8 space-y-6">
-              {/* Product Info - desktop only */}
-              <div className="hidden lg:block space-y-4">
-                <div>
-                  <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 leading-tight">{item.name}</h1>
-                  <div className="flex items-end gap-3 mt-2">
-                    <span className="text-3xl font-extrabold text-emerald-600">
-                      ${unitPrice.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
-                    </span>
-                    {type === 'combo' && item.originalPrice && item.originalPrice > 0 && (
-                      <span className="text-base text-gray-400 line-through mb-0.5">
-                        ${item.originalPrice.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
-                      </span>
-                    )}
-                    <span className="text-sm text-gray-400 mb-1">cada uno</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-0.5">
-                    {[1, 2, 3, 4, 5].map((s) => (
-                      <Star key={s} className={`w-4 h-4 ${s <= 4 ? 'fill-amber-400 text-amber-400' : 'fill-gray-200 text-gray-200'}`} />
-                    ))}
-                  </div>
-                  <span className="text-sm text-gray-400">(4.0)</span>
-                  <Separator orientation="vertical" className="h-4" />
-                  <span className="text-sm text-emerald-600 font-medium">En stock</span>
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide mb-2">Descripcion</h3>
-                  <p className="text-gray-600 leading-relaxed text-[15px]">{item.description}</p>
-                </div>
-                {type === 'combo' && item.items && (
-                  <div>
-                    <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide mb-2">Incluye</h3>
-                    <p className="text-gray-600 leading-relaxed">{item.items}</p>
-                  </div>
-                )}
+                <div className="w-px h-4 bg-gray-200" />
+                <span className="text-sm text-emerald-600 font-semibold">En stock</span>
               </div>
 
-              <Separator />
+              {/* Free Shipping Bar */}
+              <FreeShippingBar currentTotal={unitPrice * quantity} />
 
-              {/* Quantity */}
+              {/* Quantity Selector */}
               <div>
                 <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide mb-3">Cantidad</h3>
                 <div className="flex items-center gap-1">
-                  <Button variant="outline" size="icon" className="h-10 w-10 rounded-lg"
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))} disabled={quantity <= 1}>
-                    <Minus className="w-4 h-4" />
-                  </Button>
-                  <div className="h-10 w-14 flex items-center justify-center font-semibold text-lg border-y rounded-none bg-gray-50">
+                  <button
+                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
+                    disabled={quantity <= 1}
+                    className="h-10 w-10 rounded-lg border-2 border-gray-200 flex items-center justify-center hover:border-gray-300 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    <Minus className="w-4 h-4 text-gray-600" />
+                  </button>
+                  <div className="h-10 w-14 flex items-center justify-center font-semibold text-lg border-y-2 border-gray-200 bg-gray-50">
                     {quantity}
                   </div>
-                  <Button variant="outline" size="icon" className="h-10 w-10 rounded-lg"
-                    onClick={() => setQuantity(quantity + 1)}>
-                    <Plus className="w-4 h-4" />
-                  </Button>
+                  <button
+                    onClick={() => setQuantity(quantity + 1)}
+                    className="h-10 w-10 rounded-lg border-2 border-gray-200 flex items-center justify-center hover:border-gray-300 transition-colors"
+                  >
+                    <Plus className="w-4 h-4 text-gray-600" />
+                  </button>
                   <span className="text-sm text-gray-400 ml-3">
                     Subtotal: ${(unitPrice * quantity).toLocaleString('es-AR', { minimumFractionDigits: 0 })}
                   </span>
                 </div>
               </div>
 
-              <Separator />
+              {/* Action Buttons */}
+              <div className="flex flex-col gap-3 pt-2">
+                <Button
+                  className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 text-white text-base font-bold rounded-xl gap-3 shadow-lg shadow-emerald-600/20 transition-all"
+                  onClick={handleBuyNow}
+                >
+                  <ShoppingCart className="w-5 h-5" />
+                  Comprar ahora
+                </Button>
 
-              {/* Shipping Address */}
-              <ShippingAddressForm
-                postalCode={postalCode} setPostalCode={setPostalCode}
-                province={province} setProvince={setProvince}
-                city={city} setCity={setCity}
-                street={street} setStreet={setStreet}
-                number={number} setNumber={setNumber}
-                floor={floor} setFloor={setFloor}
-                onQuote={fetchShippingQuote}
-                quoting={quoting}
-                quoteError={quoteError}
-                provinces={provinces}
-              />
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className={`flex-1 h-12 rounded-xl gap-2 font-semibold transition-all ${
+                      addedToCart
+                        ? 'border-emerald-300 bg-emerald-50 text-emerald-600'
+                        : 'border-gray-200 text-gray-700 hover:bg-gray-50'
+                    }`}
+                    onClick={handleAddToCart}
+                  >
+                    <ShoppingCart className="w-4 h-4" />
+                    {addedToCart ? 'Agregado!' : 'Agregar al carrito'}
+                  </Button>
 
-              <Separator />
-
-              {/* Shipping Options */}
-              <ShippingSelector
-                andreaniOptions={andreaniOptions}
-                selectedShippingId={selectedShippingId}
-                setSelectedShippingId={setSelectedShippingId}
-                configured={andreaniConfigured}
-              />
-
-              <Separator />
-
-              {/* Buyer Info */}
-              <BuyerForm
-                buyerName={buyerName} setBuyerName={setBuyerName}
-                buyerEmail={buyerEmail} setBuyerEmail={setBuyerEmail}
-                buyerPhone={buyerPhone} setBuyerPhone={setBuyerPhone}
-                buyerDni={buyerDni} setBuyerDni={setBuyerDni}
-              />
-
-              <Separator />
-
-              {/* Price Summary */}
-              <div className="space-y-2.5 bg-gray-50 rounded-xl p-5">
-                <div className="flex justify-between text-sm text-gray-500">
-                  <span>Precio unitario</span>
-                  <span>${unitPrice.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</span>
+                  <Button
+                    variant="outline"
+                    className={`h-12 px-5 rounded-xl gap-2 transition-all ${
+                      isFavorite
+                        ? 'border-red-200 bg-red-50 text-red-500 hover:bg-red-50'
+                        : 'border-gray-200 text-gray-500 hover:bg-gray-50'
+                    }`}
+                    onClick={toggleFavorite}
+                  >
+                    <Heart className={`w-4 h-4 ${isFavorite ? 'fill-red-500' : ''}`} />
+                    <span className="text-sm">
+                      {isFavorite ? 'Guardado' : 'Favorito'}
+                    </span>
+                  </Button>
                 </div>
-                <div className="flex justify-between text-sm text-gray-500">
-                  <span>Cantidad</span>
-                  <span>x{quantity}</span>
-                </div>
-                <div className="flex justify-between text-sm text-gray-500">
-                  <span>Subtotal</span>
-                  <span>${(unitPrice * quantity).toLocaleString('es-AR', { minimumFractionDigits: 0 })}</span>
-                </div>
-                <div className="flex justify-between text-sm text-gray-500">
-                  <span>Envio ({shippingLabel})</span>
-                  <span>{shippingCost === 0 ? 'Gratis' : `$${shippingCost.toLocaleString('es-AR')}`}</span>
-                </div>
-                <Separator />
-                <div className="flex justify-between items-center">
-                  <span className="font-bold text-gray-900 text-lg">Total</span>
-                  <span className="font-extrabold text-emerald-600 text-2xl">
-                    ${totalPrice.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
-                  </span>
+
+                {/* MercadoPago badge */}
+                <div className="flex items-center justify-center gap-2 py-1">
+                  <CreditCard className="w-4 h-4 text-[#009ee3]" />
+                  <span className="text-xs text-gray-500">Aceptamos todos los medios de pago</span>
                 </div>
               </div>
 
-              {payError && (
-                <div className="bg-red-50 border border-red-200 text-red-600 text-sm p-3 rounded-lg">{payError}</div>
-              )}
+              {/* Description */}
+              <div className="pt-4">
+                <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide mb-3">Descripcion del Producto</h3>
+                <p className="text-gray-600 leading-relaxed text-[15px]">
+                  {item.description}
+                </p>
+                {type === 'combo' && item.items && (
+                  <div className="mt-3 p-3 bg-amber-50 rounded-lg border border-amber-100">
+                    <p className="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-1">Incluye</p>
+                    <p className="text-amber-800 text-sm leading-relaxed">{item.items}</p>
+                  </div>
+                )}
+              </div>
 
-              {/* Action Buttons */}
-              <div className="flex flex-col gap-3">
-                <Button
-                  className="w-full h-14 bg-[#009ee3] hover:bg-[#0089c7] text-white text-base font-bold rounded-xl gap-3 shadow-lg"
-                  onClick={onMP}
-                  disabled={payLoading}
-                >
-                  {payLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <CreditCard className="w-5 h-5" />}
-                  Pagar con MercadoPago
-                </Button>
-                <Button
-                  variant="outline"
-                  className="w-full h-12 border-emerald-200 text-emerald-600 hover:bg-emerald-50 font-semibold rounded-xl gap-2"
-                  onClick={handleWhatsApp}
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  Consultar por WhatsApp
-                </Button>
+              {/* Accordion Sections */}
+              <div className="space-y-2 pt-2">
+                <AccordionItem title="Beneficios" defaultOpen={true}>
+                  <div className="space-y-2">
+                    {item.description.split(/[.\n]/).filter(s => s.trim().length > 10).slice(0, 4).map((part, i) => (
+                      <div key={i} className="flex items-start gap-2">
+                        <Sparkles className="w-4 h-4 text-emerald-500 mt-0.5 flex-shrink-0" />
+                        <span>{part.trim()}.</span>
+                      </div>
+                    ))}
+                  </div>
+                </AccordionItem>
+
+                <AccordionItem title="Modo de uso">
+                  <p>Segui las instrucciones del envase del producto. Consulta con tu profesional de confianza para obtener los mejores resultados.</p>
+                </AccordionItem>
+
+                <AccordionItem title="Envio y entregas">
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <Truck className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium text-gray-800">Envio a todo el pais</p>
+                        <p className="text-gray-500 text-xs mt-0.5">Envio estandar: 3 a 7 dias habiles. Express: 1 a 2 dias habiles.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Package className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium text-gray-800">Producto original y sellado</p>
+                        <p className="text-gray-500 text-xs mt-0.5">Todos nuestros productos son 100% originales y se envian en su empaque original.</p>
+                      </div>
+                    </div>
+                  </div>
+                </AccordionItem>
+
+                <AccordionItem title="Politica de devoluciones">
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3">
+                      <RotateCcw className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium text-gray-800">30 dias para devolver</p>
+                        <p className="text-gray-500 text-xs mt-0.5">Si no quedas conforme, podes devolver el producto dentro de los 30 dias siguientes a la recepcion. El producto debe estar en su empaque original y sin uso.</p>
+                      </div>
+                    </div>
+                    <div className="flex items-start gap-3">
+                      <Shield className="w-5 h-5 text-emerald-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        <p className="font-medium text-gray-800">Compra segura</p>
+                        <p className="text-gray-500 text-xs mt-0.5">Tus datos estan protegidos. Trabajamos con MercadoPago para garantizar la seguridad de tu compra.</p>
+                      </div>
+                    </div>
+                  </div>
+                </AccordionItem>
+              </div>
+
+              {/* Trust Features */}
+              <div className="grid grid-cols-2 gap-3 pt-4">
+                {[
+                  { icon: Shield, label: 'Compra segura', desc: 'Datos protegidos' },
+                  { icon: RotateCcw, label: 'Devoluciones', desc: '30 dias' },
+                  { icon: Package, label: 'Producto original', desc: 'Sellado de fabrica' },
+                  { icon: CreditCard, label: 'Todos los medios', desc: 'MP / transferencia' },
+                ].map((trustItem, i) => (
+                  <div key={i} className="flex items-center gap-2.5 p-3 rounded-lg bg-gray-50">
+                    <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center flex-shrink-0">
+                      <trustItem.icon className="w-4 h-4 text-emerald-600" />
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold text-gray-700">{trustItem.label}</p>
+                      <p className="text-[10px] text-gray-400 truncate">{trustItem.desc}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           </div>
@@ -637,7 +619,6 @@ export default function ProductPage() {
         {/* AI UPSELL SECTION */}
         <div ref={upsellRef} className="mt-16">
           <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 border border-emerald-100 p-6 sm:p-8">
-            {/* Decorative elements */}
             <div className="absolute top-0 right-0 w-64 h-64 bg-emerald-200/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
             <div className="absolute bottom-0 left-0 w-48 h-48 bg-teal-200/20 rounded-full blur-3xl translate-y-1/2 -translate-x-1/2" />
 
@@ -701,9 +682,7 @@ export default function ProductPage() {
                         <p className="text-emerald-600 font-bold text-sm mb-2">
                           ${rec.price.toLocaleString('es-AR', { minimumFractionDigits: 0 })}
                         </p>
-                        <p className="text-gray-500 text-xs leading-relaxed line-clamp-2">
-                          {rec.reason}
-                        </p>
+                        <p className="text-gray-500 text-xs leading-relaxed line-clamp-2">{rec.reason}</p>
                         <div className="flex items-center gap-1 mt-2 text-emerald-600 text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
                           <span>Ver producto</span>
                           <ArrowRight className="w-3 h-3" />
@@ -713,9 +692,7 @@ export default function ProductPage() {
                   })}
                 </div>
               ) : upsellFetched ? null : (
-                <div className="text-center py-8 text-gray-400 text-sm">
-                  Cargando recomendaciones...
-                </div>
+                <div className="text-center py-8 text-gray-400 text-sm">Cargando recomendaciones...</div>
               )}
             </div>
           </div>
