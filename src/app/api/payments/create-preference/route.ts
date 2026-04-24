@@ -48,15 +48,34 @@ export async function POST(request: NextRequest) {
       buyerDni,
       itemType,
       itemId,
-      // Shipping address fields
+      // Shipping address fields (flat)
       shippingProvince,
       shippingCity,
       shippingStreet,
       shippingNumber,
       shippingFloor,
       shippingCp,
+      // Shipping address as nested object (from checkout page)
+      shippingAddress,
       orderId,
     } = body
+
+    // Extract shipping fields from shippingAddress object or flat fields
+    let finalShippingProvince = shippingProvince || null
+    let finalShippingCity = shippingCity || null
+    let finalShippingStreet = shippingStreet || null
+    let finalShippingNumber = shippingNumber || null
+    let finalShippingFloor = shippingFloor || null
+    let finalShippingCp = shippingCp || null
+
+    if (shippingAddress && typeof shippingAddress === 'object') {
+      finalShippingProvince = shippingAddress.province || shippingProvince || null
+      finalShippingCity = shippingAddress.city || shippingCity || null
+      finalShippingStreet = shippingAddress.street || shippingStreet || null
+      finalShippingNumber = shippingAddress.number || shippingNumber || null
+      finalShippingFloor = shippingAddress.floor || shippingFloor || null
+      finalShippingCp = shippingAddress.postalCode || shippingAddress.postal_code || shippingCp || null
+    }
 
     if (!title || !price || !quantity || !buyerEmail) {
       return NextResponse.json({ error: 'Datos incompletos' }, { status: 400 })
@@ -70,13 +89,13 @@ export async function POST(request: NextRequest) {
     const externalRef = `${itemType || 'product'}_${itemId}_${Date.now()}`
 
     // Build receiver address for MercadoPago
-    const receiverAddress = (shippingStreet || shippingCity || shippingProvince || shippingCp) ? {
-      zip_code: shippingCp || '',
-      street_name: shippingStreet || '',
-      street_number: shippingNumber || '',
-      apartment: shippingFloor || '',
-      city_name: shippingCity || '',
-      state_name: shippingProvince || '',
+    const receiverAddress = (finalShippingStreet || finalShippingCity || finalShippingProvince || finalShippingCp) ? {
+      zip_code: finalShippingCp || '',
+      street_name: finalShippingStreet || '',
+      street_number: finalShippingNumber || '',
+      apartment: finalShippingFloor || '',
+      city_name: finalShippingCity || '',
+      state_name: finalShippingProvince || '',
     } : undefined
 
     // Create MercadoPago preference
@@ -162,8 +181,9 @@ export async function POST(request: NextRequest) {
       sandboxInitPoint: mpData.sandbox_init_point,
       preferenceId: mpData.id,
     })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Payment error:', error)
-    return NextResponse.json({ error: 'Error al procesar el pago' }, { status: 500 })
+    const message = error?.message || 'Error al procesar el pago'
+    return NextResponse.json({ error: message, details: process.env.NODE_ENV === 'development' ? String(error) : undefined }, { status: 500 })
   }
 }

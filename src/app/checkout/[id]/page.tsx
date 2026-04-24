@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -33,7 +33,7 @@ interface ProductData {
   originalPrice?: number
 }
 
-export default function CheckoutPage() {
+function CheckoutContent() {
   const params = useParams()
   const searchParams = useSearchParams()
   const id = params.id as string
@@ -122,6 +122,7 @@ export default function CheckoutPage() {
     setPayError('')
     setPayLoading(true)
     try {
+      // 1. Create the order in the database
       const orderRes = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -134,17 +135,29 @@ export default function CheckoutPage() {
           subtotal: unitPrice * quantity,
           buyerName,
           buyerEmail,
-          buyerPhone,
-          buyerDni,
+          buyerPhone: buyerPhone || undefined,
+          buyerDni: buyerDni || undefined,
           shippingMethod: selectedOption.label,
           shippingCost,
-          shippingAddress: { postalCode, province, city, street, number, floor },
+          shippingProvince: province,
+          shippingCity: city,
+          shippingStreet: street,
+          shippingNumber: number,
+          shippingFloor: floor || undefined,
+          shippingCp: postalCode,
           total: totalPrice,
         }),
       })
+
+      if (!orderRes.ok) {
+        const orderError = await orderRes.json()
+        throw new Error(orderError.error || 'Error al crear el pedido')
+      }
+
       const orderData = await orderRes.json()
       const savedOrderId = orderData.orderId || ''
 
+      // 2. Create MercadoPago preference
       await handleMercadoPago({
         title: item!.name,
         description: item!.description,
@@ -158,7 +171,12 @@ export default function CheckoutPage() {
         buyerDni,
         itemType: type === 'combo' ? 'combo' : 'product',
         itemId: item!.id,
-        shippingAddress: { postalCode, province, city, street, number, floor },
+        shippingProvince: province,
+        shippingCity: city,
+        shippingStreet: street,
+        shippingNumber: number,
+        shippingFloor: floor,
+        shippingCp: postalCode,
         shippingMethod: selectedOption.label,
         orderId: savedOrderId,
       })
@@ -366,5 +384,25 @@ export default function CheckoutPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function CheckoutPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-gray-50">
+          <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
+            <Skeleton className="w-40 h-8 mb-8" />
+            <div className="space-y-6">
+              <Skeleton className="h-48 w-full rounded-xl" />
+              <Skeleton className="h-64 w-full rounded-xl" />
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <CheckoutContent />
+    </Suspense>
   )
 }

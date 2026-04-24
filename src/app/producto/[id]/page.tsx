@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
@@ -130,7 +130,7 @@ function AccordionItem({
   )
 }
 
-export default function ProductPage() {
+function ProductContent() {
   const params = useParams()
   const searchParams = useSearchParams()
   const id = params.id as string
@@ -750,5 +750,31 @@ export default function ProductPage() {
         </div>
       </main>
     </div>
+  )
+}
+
+export default function ProductPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen bg-white">
+          <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
+            <Skeleton className="w-32 h-8 mb-8" />
+            <div className="grid lg:grid-cols-2 gap-8 lg:gap-12">
+              <div>
+                <Skeleton className="aspect-square rounded-2xl w-full" />
+              </div>
+              <div className="space-y-6">
+                <Skeleton className="h-10 w-3/4" />
+                <Skeleton className="h-8 w-1/4" />
+                <Skeleton className="h-32 w-full" />
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+    >
+      <ProductContent />
+    </Suspense>
   )
 }

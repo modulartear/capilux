@@ -35,6 +35,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Datos incompletos para crear el pedido' }, { status: 400 })
     }
 
+    // Extract shipping fields from shippingAddress object or flat fields
+    let finalShippingProvince = shippingProvince || null
+    let finalShippingCity = shippingCity || null
+    let finalShippingStreet = shippingStreet || null
+    let finalShippingNumber = shippingNumber || null
+    let finalShippingFloor = shippingFloor || null
+    let finalShippingCp = shippingCp || null
+    let finalShippingAddress = shippingAddress ? JSON.stringify(shippingAddress) : null
+
+    // If shippingAddress is an object with nested fields, extract them
+    if (shippingAddress && typeof shippingAddress === 'object') {
+      finalShippingProvince = shippingAddress.province || shippingProvince || null
+      finalShippingCity = shippingAddress.city || shippingCity || null
+      finalShippingStreet = shippingAddress.street || shippingStreet || null
+      finalShippingNumber = shippingAddress.number || shippingNumber || null
+      finalShippingFloor = shippingAddress.floor || shippingFloor || null
+      finalShippingCp = shippingAddress.postalCode || shippingAddress.postal_code || shippingCp || null
+    }
+
     const order = await db.order.create({
       data: {
         itemType: itemType || 'product',
@@ -49,13 +68,13 @@ export async function POST(request: NextRequest) {
         buyerDni: buyerDni || null,
         shippingMethod: shippingMethod || null,
         shippingCost: parseFloat(shippingCost) || 0,
-        shippingAddress: shippingAddress ? JSON.stringify(shippingAddress) : null,
-        shippingProvince: shippingProvince || null,
-        shippingCity: shippingCity || null,
-        shippingStreet: shippingStreet || null,
-        shippingNumber: shippingNumber || null,
-        shippingFloor: shippingFloor || null,
-        shippingCp: shippingCp || null,
+        shippingAddress: finalShippingAddress,
+        shippingProvince: finalShippingProvince,
+        shippingCity: finalShippingCity,
+        shippingStreet: finalShippingStreet,
+        shippingNumber: finalShippingNumber,
+        shippingFloor: finalShippingFloor,
+        shippingCp: finalShippingCp,
         total: parseFloat(total) || 0,
         paymentRef: paymentRef || null,
         notes: notes || null,
@@ -63,9 +82,10 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json({ success: true, orderId: order.id })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Order creation error:', error)
-    return NextResponse.json({ error: 'Error al crear el pedido' }, { status: 500 })
+    const message = error?.message || 'Error al crear el pedido'
+    return NextResponse.json({ error: message, details: process.env.NODE_ENV === 'development' ? String(error) : undefined }, { status: 500 })
   }
 }
 

@@ -354,6 +354,12 @@ export async function handleMercadoPago(params: {
   itemType: 'product' | 'combo'
   itemId: string
   shippingAddress?: { postalCode: string; province: string; city: string; street: string; number: string; floor: string }
+  shippingProvince?: string
+  shippingCity?: string
+  shippingStreet?: string
+  shippingNumber?: string
+  shippingFloor?: string
+  shippingCp?: string
   shippingMethod?: string
   orderId?: string
 }) {
