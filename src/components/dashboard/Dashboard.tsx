@@ -1021,7 +1021,7 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
                         <th className="text-right p-3 font-semibold text-gray-600 whitespace-nowrap">Total</th>
                         <th className="text-left p-3 font-semibold text-gray-600 whitespace-nowrap">Pago</th>
                         <th className="text-left p-3 font-semibold text-gray-600 whitespace-nowrap">Envio</th>
-                        <th className="text-left p-3 font-semibold text-gray-600 whitespace-nowrap hidden xl:table-cell">Direccion</th>
+                        <th className="text-left p-3 font-semibold text-gray-600 whitespace-nowrap hidden md:table-cell">Direccion</th>
                         <th className="p-3 w-8"></th>
                       </tr>
                     </thead>
@@ -1069,8 +1069,12 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
                                   ))}
                                 </select>
                               </td>
-                              <td className="p-3 text-gray-500 text-xs hidden xl:table-cell max-w-[200px] truncate" title={fullAddr || '-'}>
-                                {fullAddr || '-'}
+                              <td className="p-3 text-gray-500 text-xs hidden md:table-cell max-w-[220px]" title={fullAddr || '-'}>
+                                {fullAddr ? (
+                                  <span className="line-clamp-2 leading-tight">{fullAddr}</span>
+                                ) : (
+                                  <span className="text-gray-300">-</span>
+                                )}
                               </td>
                               <td className="p-3">
                                 {isExpanded ? (
@@ -1084,7 +1088,66 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
                             {isExpanded && (
                               <tr key={`${order.id}-expanded`} className="bg-gray-50/50">
                                 <td colSpan={12} className="p-4">
-                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                  {/* SHIPPING LABEL - Most prominent section */}
+                                  <div className="mb-4 p-4 bg-white rounded-xl border-2 border-emerald-200 shadow-sm">
+                                    <div className="flex items-center justify-between mb-3">
+                                      <div className="flex items-center gap-2">
+                                        <Truck className="w-5 h-5 text-emerald-600" />
+                                        <span className="font-bold text-emerald-700 text-sm uppercase tracking-wide">Datos de Envio</span>
+                                      </div>
+                                      <div className="flex items-center gap-2">
+                                        {order.shippingMethod && (
+                                          <Badge className="bg-blue-100 text-blue-700 text-xs">
+                                            {order.shippingMethod}
+                                          </Badge>
+                                        )}
+                                        {order.shippingCost === 0 ? (
+                                          <Badge className="bg-emerald-100 text-emerald-700 text-xs">Envio gratis</Badge>
+                                        ) : (
+                                          <Badge variant="outline" className="text-xs border-gray-300 text-gray-600">
+                                            Envio: ${order.shippingCost.toLocaleString('es-AR')}
+                                          </Badge>
+                                        )}
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="h-7 text-xs gap-1 border-emerald-200 text-emerald-600 hover:bg-emerald-50"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            const label = `${order.buyerName}\n${order.buyerPhone || ''}\n${order.shippingStreet || ''} ${order.shippingNumber || ''}${order.shippingFloor ? ', ' + order.shippingFloor : ''}\n${order.shippingCity || ''}, ${order.shippingProvince || ''}\nCP: ${order.shippingCp || ''}${order.buyerDni ? '\nDNI: ' + order.buyerDni : ''}`
+                                            navigator.clipboard.writeText(label)
+                                          }}
+                                        >
+                                          <ClipboardList className="w-3 h-3" />Copiar
+                                        </Button>
+                                      </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                      <div className="space-y-1">
+                                        <p className="text-xs text-gray-400 font-medium">Destinatario</p>
+                                        <p className="text-sm font-semibold text-gray-800">{order.buyerName}</p>
+                                        {order.buyerPhone && <p className="text-sm text-gray-600">Tel: {order.buyerPhone}</p>}
+                                        {order.buyerDni && <p className="text-sm text-gray-600">DNI: {order.buyerDni}</p>}
+                                      </div>
+                                      <div className="space-y-1">
+                                        <p className="text-xs text-gray-400 font-medium">Direccion</p>
+                                        <p className="text-sm text-gray-800">
+                                          {order.shippingStreet || '-'}{order.shippingNumber ? ` ${order.shippingNumber}` : ''}{order.shippingFloor ? `, ${order.shippingFloor}` : ''}
+                                        </p>
+                                        <p className="text-sm text-gray-800">
+                                          {order.shippingCity || '-'}{order.shippingProvince ? `, ${order.shippingProvince}` : ''}
+                                        </p>
+                                        {order.shippingCp && <p className="text-sm text-gray-600">CP: {order.shippingCp}</p>}
+                                      </div>
+                                      <div className="space-y-1">
+                                        <p className="text-xs text-gray-400 font-medium">Metodo de Envio</p>
+                                        <p className="text-sm font-medium text-gray-800">{order.shippingMethod || 'Estandar'}</p>
+                                        <p className="text-sm text-gray-600">Costo: {order.shippingCost === 0 ? 'Gratis' : `$${order.shippingCost.toLocaleString('es-AR')}`}</p>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                                     <div>
                                       <span className="text-gray-400 text-xs font-medium block mb-1">DATOS DEL CLIENTE</span>
                                       <div className="space-y-1 text-sm">
@@ -1092,16 +1155,6 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
                                         <p className="text-gray-800"><span className="text-gray-500">Email:</span> {order.buyerEmail}</p>
                                         <p className="text-gray-800"><span className="text-gray-500">Telefono:</span> {order.buyerPhone || '-'}</p>
                                         <p className="text-gray-800"><span className="text-gray-500">DNI:</span> {order.buyerDni || '-'}</p>
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <span className="text-gray-400 text-xs font-medium block mb-1">DIRECCION DE ENVIO</span>
-                                      <div className="space-y-1 text-sm">
-                                        <p className="text-gray-800"><span className="text-gray-500">Provincia:</span> {order.shippingProvince || '-'}</p>
-                                        <p className="text-gray-800"><span className="text-gray-500">Ciudad:</span> {order.shippingCity || '-'}</p>
-                                        <p className="text-gray-800"><span className="text-gray-500">Direccion:</span> {shippingAddr || '-'}</p>
-                                        <p className="text-gray-800"><span className="text-gray-500">Piso/Depto:</span> {order.shippingFloor || '-'}</p>
-                                        <p className="text-gray-800"><span className="text-gray-500">CP:</span> {order.shippingCp || '-'}</p>
                                       </div>
                                     </div>
                                     <div>
