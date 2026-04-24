@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,6 +15,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   ArrowLeft,
   Plus,
@@ -38,6 +45,10 @@ import {
   ExternalLink,
   Search,
   Download,
+  ChevronDown,
+  ChevronUp,
+  Save,
+  StickyNote,
 } from 'lucide-react'
 
 interface Product {
@@ -77,12 +88,16 @@ interface Order {
   shippingMethod: string | null
   shippingCost: number
   shippingAddress: string | null
-  shippingQuoteId: string | null
+  shippingProvince: string | null
+  shippingCity: string | null
+  shippingStreet: string | null
+  shippingNumber: string | null
+  shippingFloor: string | null
+  shippingCp: string | null
   total: number
   paymentStatus: string
   paymentRef: string | null
   shippingStatus: string
-  andreaniTrack: string | null
   notes: string | null
   createdAt: string
   updatedAt: string
@@ -267,6 +282,29 @@ function ComboForm({
   )
 }
 
+const SHIPPING_STATUS_OPTIONS = [
+  { value: 'pending', label: 'Pendiente', color: 'bg-gray-100 text-gray-600' },
+  { value: 'preparing', label: 'Preparando', color: 'bg-amber-100 text-amber-700' },
+  { value: 'shipped', label: 'Enviado', color: 'bg-blue-100 text-blue-700' },
+  { value: 'delivered', label: 'Entregado', color: 'bg-emerald-100 text-emerald-700' },
+]
+
+const PAYMENT_STATUS_OPTIONS = [
+  { value: 'all', label: 'Todos' },
+  { value: 'pending', label: 'Pendiente' },
+  { value: 'approved', label: 'Aprobado' },
+  { value: 'rejected', label: 'Rechazado' },
+  { value: 'in_process', label: 'En proceso' },
+]
+
+const SHIPPING_FILTER_OPTIONS = [
+  { value: 'all', label: 'Todos' },
+  { value: 'pending', label: 'Pendiente' },
+  { value: 'preparing', label: 'Preparando' },
+  { value: 'shipped', label: 'Enviado' },
+  { value: 'delivered', label: 'Entregado' },
+]
+
 export default function Dashboard({ onGoBack }: DashboardProps) {
   const [authenticated, setAuthenticated] = useState<boolean | null>(null)
   const [email, setEmail] = useState('')
@@ -292,15 +330,11 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
   const [configLoading, setConfigLoading] = useState(false)
   const [configSaved, setConfigSaved] = useState(false)
 
-  // Andreani config states
-  const [andreaniApiUrl, setAndreaniApiUrl] = useState('')
-  const [andreaniUsername, setAndreaniUsername] = useState('')
-  const [andreaniPassword, setAndreaniPassword] = useState('')
-  const [andreaniContract, setAndreaniContract] = useState('')
-  const [andreaniSenderCp, setAndreaniSenderCp] = useState('')
-  const [andreaniSaved, setAndreaniSaved] = useState(false)
-  const [andreaniTestResult, setAndreaniTestResult] = useState<{ success: boolean; message: string } | null>(null)
-  const [andreaniTesting, setAndreaniTesting] = useState(false)
+  // Orders filter/search states
+  const [orderSearch, setOrderSearch] = useState('')
+  const [paymentFilter, setPaymentFilter] = useState('all')
+  const [shippingFilter, setShippingFilter] = useState('all')
+  const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null)
 
   // Dropi states
   const [dropiIntegrationKey, setDropiIntegrationKey] = useState('')
@@ -324,11 +358,6 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
         const data = await res.json()
         if (data.MP_ACCESS_TOKEN) setMpToken(data.MP_ACCESS_TOKEN)
         if (data.NEXT_PUBLIC_SITE_URL) setSiteURL(data.NEXT_PUBLIC_SITE_URL)
-        if (data.ANDREANI_API_URL) setAndreaniApiUrl(data.ANDREANI_API_URL)
-        if (data.ANDREANI_USERNAME) setAndreaniUsername(data.ANDREANI_USERNAME)
-        if (data.ANDREANI_PASSWORD) setAndreaniPassword(data.ANDREANI_PASSWORD)
-        if (data.ANDREANI_CONTRACT) setAndreaniContract(data.ANDREANI_CONTRACT)
-        if (data.ANDREANI_SENDER_CP) setAndreaniSenderCp(data.ANDREANI_SENDER_CP)
         if (data.DROPI_TOKEN) {
           setDropiToken(data.DROPI_TOKEN)
           setDropiIntegrationKey(data.DROPI_TOKEN)
@@ -356,51 +385,6 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
     }
   }
 
-  const handleSaveAndreani = async () => {
-    setConfigLoading(true)
-    setAndreaniSaved(false)
-    try {
-      await fetch('/api/config', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          configs: {
-            ANDREANI_API_URL: andreaniApiUrl,
-            ANDREANI_USERNAME: andreaniUsername,
-            ANDREANI_PASSWORD: andreaniPassword,
-            ANDREANI_CONTRACT: andreaniContract,
-            ANDREANI_SENDER_CP: andreaniSenderCp,
-          },
-        }),
-      })
-      setAndreaniSaved(true)
-    } finally {
-      setConfigLoading(false)
-    }
-  }
-
-  const handleTestAndreani = async () => {
-    setAndreaniTesting(true)
-    setAndreaniTestResult(null)
-    try {
-      const res = await fetch('/api/shipping/quote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postalCode: '1001', weight: 0.5 }),
-      })
-      const data = await res.json()
-      if (res.ok && data.configured) {
-        setAndreaniTestResult({ success: true, message: `Conexion exitosa! ${data.options?.length || 0} opciones de envio disponibles.` })
-      } else {
-        setAndreaniTestResult({ success: false, message: data.error || 'Error en la conexion' })
-      }
-    } catch {
-      setAndreaniTestResult({ success: false, message: 'No se pudo conectar con Andreani' })
-    } finally {
-      setAndreaniTesting(false)
-    }
-  }
-
   const fetchOrders = useCallback(async () => {
     try {
       const res = await fetch('/api/orders')
@@ -413,12 +397,25 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
     }
   }, [])
 
-  const handleUpdateTracking = async (orderId: string, tracking: string, shippingStatus: string) => {
+  const handleUpdateShippingStatus = async (orderId: string, shippingStatus: string) => {
     try {
       await fetch(`/api/orders/${orderId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ andreaniTrack: tracking, shippingStatus }),
+        body: JSON.stringify({ shippingStatus }),
+      })
+      fetchOrders()
+    } catch {
+      // ignore
+    }
+  }
+
+  const handleUpdateNotes = async (orderId: string, notes: string) => {
+    try {
+      await fetch(`/api/orders/${orderId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes }),
       })
       fetchOrders()
     } catch {
@@ -560,13 +557,66 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
     }
   }
 
+  const shippingStatusColor = (status: string) => {
+    switch (status) {
+      case 'preparing': return 'bg-amber-100 text-amber-700'
+      case 'shipped': return 'bg-blue-100 text-blue-700'
+      case 'delivered': return 'bg-emerald-100 text-emerald-700'
+      default: return 'bg-gray-100 text-gray-600'
+    }
+  }
+
   const shippingStatusLabel = (status: string) => {
     switch (status) {
+      case 'preparing': return 'Preparando'
       case 'shipped': return 'Enviado'
       case 'delivered': return 'Entregado'
-      case 'pending': return 'Pendiente'
-      default: return status
+      default: return 'Pendiente'
     }
+  }
+
+  // Filtered orders
+  const filteredOrders = useMemo(() => {
+    return orders.filter(order => {
+      const matchesSearch = orderSearch === '' ||
+        order.buyerName.toLowerCase().includes(orderSearch.toLowerCase()) ||
+        order.buyerEmail.toLowerCase().includes(orderSearch.toLowerCase()) ||
+        order.itemName.toLowerCase().includes(orderSearch.toLowerCase()) ||
+        order.id.toLowerCase().includes(orderSearch.toLowerCase())
+      const matchesPayment = paymentFilter === 'all' || order.paymentStatus === paymentFilter
+      const matchesShipping = shippingFilter === 'all' || order.shippingStatus === shippingFilter
+      return matchesSearch && matchesPayment && matchesShipping
+    })
+  }, [orders, orderSearch, paymentFilter, shippingFilter])
+
+  // Export CSV
+  const handleExportCSV = () => {
+    const headers = ['Fecha', 'Cliente', 'Email', 'Telefono', 'Producto', 'Cantidad', 'Tipo', 'Subtotal', 'Total', 'Estado Pago', 'Estado Envio', 'Provincia', 'Ciudad', 'Direccion', 'CP']
+    const rows = filteredOrders.map(o => [
+      new Date(o.createdAt).toLocaleDateString('es-AR'),
+      o.buyerName,
+      o.buyerEmail,
+      o.buyerPhone || '',
+      o.itemName,
+      o.quantity,
+      o.itemType === 'combo' ? 'Combo' : 'Producto',
+      o.subtotal,
+      o.total,
+      paymentStatusLabel(o.paymentStatus),
+      shippingStatusLabel(o.shippingStatus),
+      o.shippingProvince || '',
+      o.shippingCity || '',
+      `${o.shippingStreet || ''} ${o.shippingNumber || ''}`.trim(),
+      o.shippingCp || '',
+    ])
+    const csv = [headers, ...rows].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `ordenes-capilux-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
   }
 
   // Dropi handlers
@@ -591,7 +641,6 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
         setDropiToken(data.token)
         setDropiConnected(true)
         setDropiDebug(null)
-        // Guardar en la DB para persistir
         await fetch('/api/config', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -762,13 +811,12 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
             <div>
               <h1 className="text-2xl font-bold text-gray-800">Gestion de Contenido</h1>
-              <p className="text-gray-400 text-sm mt-1">Administra productos, combos, envios y pedidos</p>
+              <p className="text-gray-400 text-sm mt-1">Administra productos, combos y pedidos</p>
             </div>
             <TabsList className="flex-wrap h-auto gap-1">
               <TabsTrigger value="productos" className="gap-1.5 text-xs sm:text-sm"><Package className="w-4 h-4" />Productos</TabsTrigger>
               <TabsTrigger value="combos" className="gap-1.5 text-xs sm:text-sm"><Layers className="w-4 h-4" />Combos</TabsTrigger>
-              <TabsTrigger value="pedidos" className="gap-1.5 text-xs sm:text-sm"><ClipboardList className="w-4 h-4" />Pedidos</TabsTrigger>
-              <TabsTrigger value="envios" className="gap-1.5 text-xs sm:text-sm"><Truck className="w-4 h-4" />Andreani</TabsTrigger>
+              <TabsTrigger value="pedidos" className="gap-1.5 text-xs sm:text-sm"><ClipboardList className="w-4 h-4" />Ordenes</TabsTrigger>
               <TabsTrigger value="dropi" className="gap-1.5 text-xs sm:text-sm"><Download className="w-4 h-4" />Dropi</TabsTrigger>
               <TabsTrigger value="config" className="gap-1.5 text-xs sm:text-sm"><CreditCard className="w-4 h-4" /><span className="hidden sm:inline">MP</span></TabsTrigger>
             </TabsList>
@@ -893,207 +941,226 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
             )}
           </TabsContent>
 
-          {/* Orders Tab */}
+          {/* Orders Tab - Spreadsheet View */}
           <TabsContent value="pedidos" className="space-y-4">
-            <div className="flex justify-between items-center">
+            {/* Header & Filters */}
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-4">
               <div>
-                <h2 className="text-lg font-bold text-gray-800">Pedidos ({orders.length})</h2>
-                <p className="text-gray-400 text-sm">Historial completo de pedidos</p>
+                <h2 className="text-lg font-bold text-gray-800">Ordenes de Venta ({filteredOrders.length})</h2>
+                <p className="text-gray-400 text-sm">Historial completo de ordenes</p>
               </div>
-              <Button variant="outline" className="gap-2" onClick={fetchOrders}>
-                <RefreshCw className="w-4 h-4" />Actualizar
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="outline" className="gap-2" onClick={fetchOrders}>
+                  <RefreshCw className="w-4 h-4" />Actualizar
+                </Button>
+                <Button variant="outline" className="gap-2" onClick={handleExportCSV} disabled={filteredOrders.length === 0}>
+                  <Download className="w-4 h-4" />Exportar CSV
+                </Button>
+              </div>
             </div>
-            {orders.length === 0 ? (
+
+            {/* Search & Filters */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                    <Input
+                      placeholder="Buscar por nombre, email, producto..."
+                      value={orderSearch}
+                      onChange={(e) => setOrderSearch(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <Select value={paymentFilter} onValueChange={setPaymentFilter}>
+                    <SelectTrigger className="w-full sm:w-[160px]">
+                      <SelectValue placeholder="Estado Pago" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PAYMENT_STATUS_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={shippingFilter} onValueChange={setShippingFilter}>
+                    <SelectTrigger className="w-full sm:w-[160px]">
+                      <SelectValue placeholder="Estado Envio" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {SHIPPING_FILTER_OPTIONS.map(opt => (
+                        <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Orders Table */}
+            {filteredOrders.length === 0 ? (
               <Card>
                 <CardContent className="flex flex-col items-center justify-center py-16">
                   <ClipboardList className="w-16 h-16 text-gray-300 mb-4" />
-                  <p className="text-gray-400 text-lg">No hay pedidos aun</p>
-                  <p className="text-gray-300 text-sm mt-1">Los pedidos apareceran aqui cuando los clientes compren</p>
+                  <p className="text-gray-400 text-lg">No hay ordenes</p>
+                  <p className="text-gray-300 text-sm mt-1">Las ordenes apareceran aqui cuando los clientes compren</p>
                 </CardContent>
               </Card>
             ) : (
-              <div className="space-y-3">
-                {orders.map((order) => {
-                  const addr = order.shippingAddress ? JSON.parse(order.shippingAddress) : null
-                  return (
-                    <Card key={order.id} className="overflow-hidden">
-                      <CardContent className="p-5">
-                        <div className="flex flex-col lg:flex-row lg:items-start gap-4">
-                          <div className="flex-1 space-y-3">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span className="font-bold text-gray-800">{order.itemName}</span>
-                              <Badge variant="outline" className="text-xs">{order.itemType === 'combo' ? 'Combo' : 'Producto'}</Badge>
-                              <Badge className={paymentStatusColor(order.paymentStatus)}>{paymentStatusLabel(order.paymentStatus)}</Badge>
-                              <Badge className="bg-blue-100 text-blue-700 text-xs">{shippingStatusLabel(order.shippingStatus)}</Badge>
-                            </div>
-                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                              <div>
-                                <span className="text-gray-400 block text-xs">Cliente</span>
-                                <span className="font-medium text-gray-700">{order.buyerName}</span>
-                              </div>
-                              <div>
-                                <span className="text-gray-400 block text-xs">Email</span>
-                                <span className="font-medium text-gray-700">{order.buyerEmail}</span>
-                              </div>
-                              <div>
-                                <span className="text-gray-400 block text-xs">Telefono</span>
-                                <span className="font-medium text-gray-700">{order.buyerPhone || '-'}</span>
-                              </div>
-                              <div>
-                                <span className="text-gray-400 block text-xs">DNI</span>
-                                <span className="font-medium text-gray-700">{order.buyerDni || '-'}</span>
-                              </div>
-                            </div>
-                            {addr && (
-                              <div className="text-sm">
-                                <span className="text-gray-400 text-xs block">Direccion de envio</span>
-                                <span className="font-medium text-gray-700">{addr.street} {addr.number}{addr.floor ? `, ${addr.floor}` : ''}, {addr.city}, {addr.province} (CP: {addr.postalCode})</span>
-                              </div>
+              <Card>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b bg-gray-50">
+                        <th className="text-left p-3 font-semibold text-gray-600 whitespace-nowrap">Fecha</th>
+                        <th className="text-left p-3 font-semibold text-gray-600 whitespace-nowrap">Cliente</th>
+                        <th className="text-left p-3 font-semibold text-gray-600 whitespace-nowrap hidden lg:table-cell">Email</th>
+                        <th className="text-left p-3 font-semibold text-gray-600 whitespace-nowrap hidden xl:table-cell">Telefono</th>
+                        <th className="text-left p-3 font-semibold text-gray-600 whitespace-nowrap">Producto</th>
+                        <th className="text-left p-3 font-semibold text-gray-600 whitespace-nowrap hidden md:table-cell">Tipo</th>
+                        <th className="text-right p-3 font-semibold text-gray-600 whitespace-nowrap hidden md:table-cell">Subtotal</th>
+                        <th className="text-right p-3 font-semibold text-gray-600 whitespace-nowrap">Total</th>
+                        <th className="text-left p-3 font-semibold text-gray-600 whitespace-nowrap">Pago</th>
+                        <th className="text-left p-3 font-semibold text-gray-600 whitespace-nowrap">Envio</th>
+                        <th className="text-left p-3 font-semibold text-gray-600 whitespace-nowrap hidden xl:table-cell">Direccion</th>
+                        <th className="p-3 w-8"></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filteredOrders.map((order) => {
+                        const isExpanded = expandedOrderId === order.id
+                        const orderDate = new Date(order.createdAt).toLocaleDateString('es-AR')
+                        const shippingAddr = [order.shippingStreet, order.shippingNumber, order.shippingFloor].filter(Boolean).join(' ')
+                        const fullAddr = [shippingAddr, order.shippingCity, order.shippingProvince, order.shippingCp ? `CP: ${order.shippingCp}` : null].filter(Boolean).join(', ')
+
+                        return (
+                          <>
+                            <tr
+                              key={order.id}
+                              className="border-b hover:bg-gray-50 cursor-pointer transition-colors"
+                              onClick={() => setExpandedOrderId(isExpanded ? null : order.id)}
+                            >
+                              <td className="p-3 text-gray-600 whitespace-nowrap">{orderDate}</td>
+                              <td className="p-3 font-medium text-gray-800 whitespace-nowrap">{order.buyerName}</td>
+                              <td className="p-3 text-gray-600 hidden lg:table-cell">{order.buyerEmail}</td>
+                              <td className="p-3 text-gray-600 hidden xl:table-cell">{order.buyerPhone || '-'}</td>
+                              <td className="p-3 text-gray-800 whitespace-nowrap">
+                                {order.itemName} <span className="text-gray-400">x{order.quantity}</span>
+                              </td>
+                              <td className="p-3 hidden md:table-cell">
+                                <Badge variant="outline" className={`text-xs ${order.itemType === 'combo' ? 'border-amber-200 text-amber-700' : 'border-gray-200 text-gray-600'}`}>
+                                  {order.itemType === 'combo' ? 'Combo' : 'Producto'}
+                                </Badge>
+                              </td>
+                              <td className="p-3 text-right text-gray-600 hidden md:table-cell">${order.subtotal.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</td>
+                              <td className="p-3 text-right font-bold text-emerald-600 whitespace-nowrap">${order.total.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</td>
+                              <td className="p-3">
+                                <Badge className={`${paymentStatusColor(order.paymentStatus)} text-xs whitespace-nowrap`}>
+                                  {paymentStatusLabel(order.paymentStatus)}
+                                </Badge>
+                              </td>
+                              <td className="p-3" onClick={(e) => e.stopPropagation()}>
+                                <select
+                                  value={order.shippingStatus}
+                                  onChange={(e) => handleUpdateShippingStatus(order.id, e.target.value)}
+                                  className={`text-xs rounded-full px-2 py-1 border-0 font-medium cursor-pointer ${shippingStatusColor(order.shippingStatus)}`}
+                                >
+                                  {SHIPPING_STATUS_OPTIONS.map(opt => (
+                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
+                                  ))}
+                                </select>
+                              </td>
+                              <td className="p-3 text-gray-500 text-xs hidden xl:table-cell max-w-[200px] truncate" title={fullAddr || '-'}>
+                                {fullAddr || '-'}
+                              </td>
+                              <td className="p-3">
+                                {isExpanded ? (
+                                  <ChevronUp className="w-4 h-4 text-gray-400" />
+                                ) : (
+                                  <ChevronDown className="w-4 h-4 text-gray-400" />
+                                )}
+                              </td>
+                            </tr>
+                            {/* Expanded row */}
+                            {isExpanded && (
+                              <tr key={`${order.id}-expanded`} className="bg-gray-50/50">
+                                <td colSpan={12} className="p-4">
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                                    <div>
+                                      <span className="text-gray-400 text-xs font-medium block mb-1">DATOS DEL CLIENTE</span>
+                                      <div className="space-y-1 text-sm">
+                                        <p className="text-gray-800"><span className="text-gray-500">Nombre:</span> {order.buyerName}</p>
+                                        <p className="text-gray-800"><span className="text-gray-500">Email:</span> {order.buyerEmail}</p>
+                                        <p className="text-gray-800"><span className="text-gray-500">Telefono:</span> {order.buyerPhone || '-'}</p>
+                                        <p className="text-gray-800"><span className="text-gray-500">DNI:</span> {order.buyerDni || '-'}</p>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-400 text-xs font-medium block mb-1">DIRECCION DE ENVIO</span>
+                                      <div className="space-y-1 text-sm">
+                                        <p className="text-gray-800"><span className="text-gray-500">Provincia:</span> {order.shippingProvince || '-'}</p>
+                                        <p className="text-gray-800"><span className="text-gray-500">Ciudad:</span> {order.shippingCity || '-'}</p>
+                                        <p className="text-gray-800"><span className="text-gray-500">Direccion:</span> {shippingAddr || '-'}</p>
+                                        <p className="text-gray-800"><span className="text-gray-500">Piso/Depto:</span> {order.shippingFloor || '-'}</p>
+                                        <p className="text-gray-800"><span className="text-gray-500">CP:</span> {order.shippingCp || '-'}</p>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-400 text-xs font-medium block mb-1">DETALLE DEL PEDIDO</span>
+                                      <div className="space-y-1 text-sm">
+                                        <p className="text-gray-800"><span className="text-gray-500">Producto:</span> {order.itemName}</p>
+                                        <p className="text-gray-800"><span className="text-gray-500">Tipo:</span> {order.itemType === 'combo' ? 'Combo' : 'Producto'}</p>
+                                        <p className="text-gray-800"><span className="text-gray-500">Cantidad:</span> {order.quantity}</p>
+                                        <p className="text-gray-800"><span className="text-gray-500">Precio unit.:</span> ${order.itemPrice.toLocaleString('es-AR')}</p>
+                                        <p className="text-gray-800"><span className="text-gray-500">Envio:</span> ${order.shippingCost.toLocaleString('es-AR')}</p>
+                                        <p className="font-bold text-emerald-600"><span className="text-gray-500 font-normal">Total:</span> ${order.total.toLocaleString('es-AR')}</p>
+                                      </div>
+                                    </div>
+                                    <div>
+                                      <span className="text-gray-400 text-xs font-medium block mb-1">INFO Y NOTAS</span>
+                                      <div className="space-y-1 text-sm">
+                                        <p className="text-gray-800"><span className="text-gray-500">Fecha:</span> {new Date(order.createdAt).toLocaleString('es-AR')}</p>
+                                        <p className="text-gray-800"><span className="text-gray-500">Ref:</span> {order.id.slice(0, 10)}</p>
+                                        {order.paymentRef && (
+                                          <p className="text-gray-800"><span className="text-gray-500">Ref Pago:</span> {order.paymentRef}</p>
+                                        )}
+                                      </div>
+                                      <div className="mt-2 space-y-1.5">
+                                        <div className="flex items-center gap-1 text-xs text-gray-400">
+                                          <StickyNote className="w-3 h-3" /> Notas internas
+                                        </div>
+                                        <Textarea
+                                          placeholder="Agregar nota..."
+                                          defaultValue={order.notes || ''}
+                                          rows={2}
+                                          className="text-xs resize-none"
+                                          onClick={(e) => e.stopPropagation()}
+                                        />
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          className="w-full h-7 text-xs gap-1"
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            const textarea = e.currentTarget.closest('div')?.querySelector('textarea') as HTMLTextAreaElement
+                                            if (textarea) handleUpdateNotes(order.id, textarea.value)
+                                          }}
+                                        >
+                                          <Save className="w-3 h-3" />Guardar nota
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </td>
+                              </tr>
                             )}
-                            <div className="text-xs text-gray-400">
-                              {new Date(order.createdAt).toLocaleString('es-AR')} - Ref: {order.id.slice(0, 8)}
-                            </div>
-                          </div>
-                          <div className="flex flex-col items-end gap-2 lg:min-w-[200px]">
-                            <div className="text-right">
-                              <span className="text-gray-400 text-xs block">Total</span>
-                              <span className="text-xl font-bold text-emerald-600">${order.total.toLocaleString('es-AR', { minimumFractionDigits: 0 })}</span>
-                            </div>
-                            <div className="text-right text-xs text-gray-400">
-                              {order.quantity}x ${order.itemPrice.toLocaleString('es-AR')}
-                              {order.shippingCost > 0 && ` + Envio $${order.shippingCost.toLocaleString('es-AR')}`}
-                            </div>
-                            {/* Tracking */}
-                            <div className="flex items-center gap-2 w-full mt-2">
-                              <Input
-                                placeholder="Numero de tracking Andreani"
-                                value={order.andreaniTrack || ''}
-                                onChange={(e) => {
-                                  const val = e.target.value
-                                  setOrders(prev => prev.map(o => o.id === order.id ? { ...o, andreaniTrack: val } : o))
-                                }}
-                                className="h-8 text-xs"
-                              />
-                              <Button
-                                size="sm"
-                                className="h-8 px-3 bg-blue-600 hover:bg-blue-700"
-                                onClick={() => handleUpdateTracking(order.id, order.andreaniTrack || '', order.shippingStatus === 'pending' ? 'shipped' : order.shippingStatus)}
-                              >
-                                <Check className="w-3 h-3" />
-                              </Button>
-                            </div>
-                            {order.andreaniTrack && (
-                              <a
-                                href={`https://www.andreani.com.ar/seguimiento/envio/${order.andreaniTrack}`}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-                              >
-                                <ExternalLink className="w-3 h-3" />Ver seguimiento
-                              </a>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-              </div>
+                          </>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
             )}
-          </TabsContent>
-
-          {/* Andreani Config Tab */}
-          <TabsContent value="envios" className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Truck className="w-5 h-5" />
-                  Configuracion de Andreani
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-5">
-                <p className="text-gray-500 text-sm">
-                  Configura tu cuenta de Andreani para calcular costos de envio automaticamente.
-                  Necesitas las credenciales de API de tu cuenta Andreani. Podes obtenerlas desde{' '}
-                  <a href="https://developers.andreani.com.ar" target="_blank" rel="noreferrer" className="text-blue-600 underline hover:text-blue-700">Andreani Developers</a>.
-                </p>
-                <div className="space-y-4">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="apiUrl" className="text-sm font-medium">URL de API Andreani</Label>
-                      <div className="relative">
-                        <Globe className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                        <Input id="apiUrl" value={andreaniApiUrl} onChange={(e) => setAndreaniApiUrl(e.target.value)} placeholder="https://api.andreani.com.ar" className="pl-10 h-11" />
-                      </div>
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="contract" className="text-sm font-medium">Numero de Contrato</Label>
-                      <Input id="contract" value={andreaniContract} onChange={(e) => setAndreaniContract(e.target.value)} placeholder="12345678" className="h-11" />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5">
-                      <Label htmlFor="andUsername" className="text-sm font-medium">Usuario API (x-username)</Label>
-                      <Input id="andUsername" value={andreaniUsername} onChange={(e) => setAndreaniUsername(e.target.value)} placeholder="tu_usuario" className="h-11" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label htmlFor="andPassword" className="text-sm font-medium">Clave API (x-password)</Label>
-                      <Input id="andPassword" type="password" value={andreaniPassword} onChange={(e) => setAndreaniPassword(e.target.value)} placeholder="tu_clave" className="h-11" />
-                    </div>
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label htmlFor="senderCp" className="text-sm font-medium">Codigo Postal de Origen (tu deposito)</Label>
-                    <Input id="senderCp" value={andreaniSenderCp} onChange={(e) => setAndreaniSenderCp(e.target.value)} placeholder="1001" className="h-11 max-w-xs" />
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <Button onClick={handleSaveAndreani} disabled={configLoading} className="bg-blue-600 hover:bg-blue-700 gap-2">
-                    {configLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                    Guardar Configuracion Andreani
-                  </Button>
-                  <Button onClick={handleTestAndreani} disabled={andreaniTesting} variant="outline" className="gap-2">
-                    {andreaniTesting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Settings className="w-4 h-4" />}
-                    Probar Conexion
-                  </Button>
-                </div>
-                {andreaniSaved && (
-                  <p className="text-emerald-600 text-sm flex items-center gap-1"><Check className="w-4 h-4" /> Configuracion de Andreani guardada correctamente</p>
-                )}
-                {andreaniTestResult && (
-                  <div className={`p-3 rounded-lg text-sm ${andreaniTestResult.success ? 'bg-emerald-50 text-emerald-700' : 'bg-red-50 text-red-600'}`}>
-                    {andreaniTestResult.message}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Shipping Info */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <Package className="w-5 h-5" />
-                  Info de Envios
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4 text-sm text-gray-600">
-                <p>Los envios se calculan automaticamente usando la API de Andreani cuando el cliente ingresa su codigo postal. El sistema obtiene las tarifas disponibles para ese destino y las muestra en el checkout.</p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="p-4 bg-blue-50 rounded-lg">
-                    <h4 className="font-semibold text-blue-800 mb-1">Peso por defecto</h4>
-                    <p className="text-blue-600">0.5 kg (suplementos)</p>
-                  </div>
-                  <div className="p-4 bg-blue-50 rounded-lg">
-                    <h4 className="font-semibold text-blue-800 mb-1">Dimensiones por defecto</h4>
-                    <p className="text-blue-600">25x15x10 cm</p>
-                  </div>
-                  <div className="p-4 bg-blue-50 rounded-lg">
-                    <h4 className="font-semibold text-blue-800 mb-1">Cotizacion en vivo</h4>
-                    <p className="text-blue-600">Directo desde Andreani</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
           </TabsContent>
 
           {/* MercadoPago Config Tab */}

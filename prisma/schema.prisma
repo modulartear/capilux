@@ -41,27 +41,31 @@ model Config {
 }
 
 model Order {
-  id              String   @id @default(cuid())
-  itemType        String
-  itemId          String
-  itemName        String
-  itemPrice       Float
-  quantity        Int
-  subtotal        Float
-  buyerName       String
-  buyerEmail      String
-  buyerPhone      String?
-  buyerDni        String?
-  shippingMethod  String?
-  shippingCost    Float    @default(0)
-  shippingAddress String?
-  shippingQuoteId String?
-  total           Float
-  paymentStatus   String   @default("pending")
-  paymentRef      String?
-  shippingStatus  String   @default("pending")
-  andreaniTrack   String?
-  notes           String?
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
+  id                String   @id @default(cuid())
+  itemType          String
+  itemId            String
+  itemName          String
+  itemPrice         Float
+  quantity          Int
+  subtotal          Float
+  buyerName         String
+  buyerEmail        String
+  buyerPhone        String?
+  buyerDni          String?
+  shippingMethod    String?
+  shippingCost      Float    @default(0)
+  shippingAddress   String?
+  shippingProvince  String?
+  shippingCity      String?
+  shippingStreet    String?
+  shippingNumber    String?
+  shippingFloor     String?
+  shippingCp        String?
+  total             Float
+  paymentStatus     String   @default("pending")
+  paymentRef        String?
+  shippingStatus    String   @default("pending")
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
 }

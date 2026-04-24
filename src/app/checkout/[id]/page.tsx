@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { useParams, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -20,7 +20,6 @@ import {
   ShippingSelector,
   handleMercadoPago,
   fallbackShipping,
-  type ShippingOption,
 } from '@/components/checkout/CheckoutForms'
 
 interface ProductData {
@@ -58,12 +57,7 @@ export default function CheckoutPage() {
   const [street, setStreet] = useState('')
   const [number, setNumber] = useState('')
   const [floor, setFloor] = useState('')
-  const [provinces, setProvinces] = useState<Array<{ code: string; name: string }>>([])
-  const [andreaniOptions, setAndreaniOptions] = useState<ShippingOption[]>([])
   const [selectedShippingId, setSelectedShippingId] = useState('standard')
-  const [andreaniConfigured, setAndreaniConfigured] = useState(false)
-  const [quoting, setQuoting] = useState(false)
-  const [quoteError, setQuoteError] = useState('')
 
   useEffect(() => {
     async function fetchData() {
@@ -82,42 +76,35 @@ export default function CheckoutPage() {
     if (id) fetchData()
   }, [id, type])
 
-  useEffect(() => {
-    fetch('/api/shipping/provinces')
-      .then(res => res.json())
-      .then(data => { if (Array.isArray(data)) setProvinces(data) })
-      .catch(() => {})
-  }, [])
-
-  const fetchShippingQuote = useCallback(async (cp: string) => {
-    if (!cp || cp.length < 4) return
-    setQuoting(true)
-    setQuoteError('')
-    try {
-      const res = await fetch('/api/shipping/quote', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ postalCode: cp, weight: 0.5, dimensions: { length: 25, width: 15, height: 10 } }),
-      })
-      const data = await res.json()
-      if (data.configured && Array.isArray(data.options) && data.options.length > 0) {
-        setAndreaniOptions(data.options)
-        setAndreaniConfigured(true)
-        setSelectedShippingId(data.options[0].id)
-      } else {
-        setAndreaniConfigured(false)
-        setQuoteError(data.error || 'No se pudo obtener la cotizacion. Se usara tarifa estandar.')
-      }
-    } catch {
-      setQuoteError('Error de conexion. Se usara tarifa estandar.')
-      setAndreaniConfigured(false)
-    } finally {
-      setQuoting(false)
-    }
-  }, [])
+  const provinces = [
+    { code: 'B', name: 'Buenos Aires' },
+    { code: 'C', name: 'Ciudad Autonoma de Buenos Aires' },
+    { code: 'K', name: 'Catamarca' },
+    { code: 'H', name: 'Chaco' },
+    { code: 'U', name: 'Chubut' },
+    { code: 'X', name: 'Cordoba' },
+    { code: 'W', name: 'Corrientes' },
+    { code: 'E', name: 'Entre Rios' },
+    { code: 'P', name: 'Formosa' },
+    { code: 'Y', name: 'Jujuy' },
+    { code: 'L', name: 'La Pampa' },
+    { code: 'F', name: 'La Rioja' },
+    { code: 'M', name: 'Mendoza' },
+    { code: 'N', name: 'Misiones' },
+    { code: 'Q', name: 'Neuquen' },
+    { code: 'R', name: 'Rio Negro' },
+    { code: 'A', name: 'Salta' },
+    { code: 'J', name: 'San Juan' },
+    { code: 'D', name: 'San Luis' },
+    { code: 'Z', name: 'Santa Cruz' },
+    { code: 'S', name: 'Santa Fe' },
+    { code: 'G', name: 'Santiago del Estero' },
+    { code: 'V', name: 'Tierra del Fuego' },
+    { code: 'T', name: 'Tucuman' },
+  ]
 
   const unitPrice = item?.price || 0
-  const activeOptions = andreaniConfigured && andreaniOptions.length > 0 ? andreaniOptions : [fallbackShipping.standard, fallbackShipping.express]
+  const activeOptions = [fallbackShipping.standard, fallbackShipping.express]
   const selectedOption = activeOptions.find(o => o.id === selectedShippingId) || activeOptions[0]
   const shippingCost = selectedOption.cost
   const shippingLabel = selectedOption.label
@@ -276,9 +263,9 @@ export default function CheckoutPage() {
                 street={street} setStreet={setStreet}
                 number={number} setNumber={setNumber}
                 floor={floor} setFloor={setFloor}
-                onQuote={fetchShippingQuote}
-                quoting={quoting}
-                quoteError={quoteError}
+                onQuote={() => {}}
+                quoting={false}
+                quoteError={''}
                 provinces={provinces}
               />
             </div>
@@ -286,10 +273,8 @@ export default function CheckoutPage() {
             {/* Shipping Method */}
             <div className="bg-white rounded-xl border p-5">
               <ShippingSelector
-                andreaniOptions={andreaniOptions}
                 selectedShippingId={selectedShippingId}
                 setSelectedShippingId={setSelectedShippingId}
-                configured={andreaniConfigured}
               />
             </div>
 

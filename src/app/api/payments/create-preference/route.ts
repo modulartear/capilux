@@ -49,9 +49,12 @@ export async function POST(request: NextRequest) {
       itemType,
       itemId,
       // Shipping address fields
-      shippingMethod,
-      shippingAddress,
-      shippingQuoteId,
+      shippingProvince,
+      shippingCity,
+      shippingStreet,
+      shippingNumber,
+      shippingFloor,
+      shippingCp,
       orderId,
     } = body
 
@@ -65,6 +68,16 @@ export async function POST(request: NextRequest) {
     const shipCost = parseFloat(shippingCost) || 0
     const totalAmount = itemPrice * itemQty + shipCost
     const externalRef = `${itemType || 'product'}_${itemId}_${Date.now()}`
+
+    // Build receiver address for MercadoPago
+    const receiverAddress = (shippingStreet || shippingCity || shippingProvince || shippingCp) ? {
+      zip_code: shippingCp || '',
+      street_name: shippingStreet || '',
+      street_number: shippingNumber || '',
+      apartment: shippingFloor || '',
+      city_name: shippingCity || '',
+      state_name: shippingProvince || '',
+    } : undefined
 
     // Create MercadoPago preference
     const mpResponse = await fetch('https://api.mercadopago.com/checkout/preferences', {
@@ -88,8 +101,8 @@ export async function POST(request: NextRequest) {
           ...(shipCost > 0 ? [
             {
               id: `shipping-${Date.now()}`,
-              title: shippingLabel || 'Envio Andreani',
-              description: shippingLabel || 'Costo de envio por Andreani',
+              title: shippingLabel || 'Envio',
+              description: shippingLabel || 'Costo de envio',
               quantity: 1,
               unit_price: shipCost,
               currency_id: 'ARS',
@@ -109,14 +122,7 @@ export async function POST(request: NextRequest) {
           },
         },
         shipments: {
-          receiver_address: shippingAddress ? {
-            zip_code: shippingAddress.postalCode || '',
-            street_name: shippingAddress.street || '',
-            street_number: shippingAddress.number || '',
-            apartment: shippingAddress.floor || '',
-            city_name: shippingAddress.city || '',
-            state_name: shippingAddress.province || '',
-          } : undefined,
+          receiver_address: receiverAddress,
         },
         back_urls: {
           success: `${siteURL}/#pago-exitoso`,

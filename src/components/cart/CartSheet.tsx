@@ -182,34 +182,15 @@ export function CartSheet() {
 
             {/* Actions */}
             <div className="flex flex-col gap-2">
-              {items.length === 1 ? (
-                // Single item: go directly to checkout
-                <Button
-                  className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl gap-2 shadow-lg shadow-emerald-600/20"
-                  onClick={() => {
-                    const item = items[0]
-                    const query = item.type === 'combo' ? `?type=combo&qty=${item.quantity}` : `?qty=${item.quantity}`
-                    window.location.href = `/checkout/${item.id}${query}`
-                  }}
-                >
-                  Comprar ahora
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
-              ) : (
-                // Multiple items: buy each separately or go to first
-                <Button
-                  className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl gap-2 shadow-lg shadow-emerald-600/20"
-                  onClick={() => {
-                    // Go to checkout with first item (multi-item checkout could be added later)
-                    const item = items[0]
-                    const query = item.type === 'combo' ? `?type=combo&qty=${item.quantity}` : `?qty=${item.quantity}`
-                    window.location.href = `/checkout/${item.id}${query}`
-                  }}
-                >
-                  Iniciar compra
-                  <ArrowRight className="w-4 h-4" />
-                </Button>
-              )}
+              <Button
+                className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl gap-2 shadow-lg shadow-emerald-600/20"
+                onClick={() => {
+                  window.location.href = '/carrito'
+                }}
+              >
+                Finalizar Compra
+                <ArrowRight className="w-4 h-4" />
+              </Button>
 
               <Button
                 variant="ghost"

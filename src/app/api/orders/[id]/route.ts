@@ -16,10 +16,9 @@ export async function PUT(request: NextRequest, { params }: { params: Promise<{ 
 
     const { id } = await params
     const body = await request.json()
-    const { andreaniTrack, shippingStatus, notes } = body
+    const { shippingStatus, notes } = body
 
     const updateData: Record<string, unknown> = {}
-    if (andreaniTrack !== undefined) updateData.andreaniTrack = andreaniTrack
     if (shippingStatus !== undefined) updateData.shippingStatus = shippingStatus
     if (notes !== undefined) updateData.notes = notes
 

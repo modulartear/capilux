@@ -267,17 +267,13 @@ export function ShippingAddressForm({
    SHIPPING SELECTOR
    ============================== */
 export function ShippingSelector({
-  andreaniOptions,
   selectedShippingId,
   setSelectedShippingId,
-  configured,
 }: {
-  andreaniOptions: ShippingOption[]
   selectedShippingId: string
   setSelectedShippingId: (v: string) => void
-  configured: boolean
 }) {
-  const options = configured && andreaniOptions.length > 0 ? andreaniOptions : [
+  const options = [
     fallbackShipping.standard,
     fallbackShipping.express,
   ]
@@ -286,7 +282,6 @@ export function ShippingSelector({
     <div>
       <h3 className="font-semibold text-gray-800 text-sm uppercase tracking-wide mb-3">
         Metodo de Envio
-        {configured && <Badge className="ml-2 bg-blue-100 text-blue-700 text-[10px] px-2 py-0.5 hover:bg-blue-100">Andreani</Badge>}
       </h3>
       <div className="space-y-2">
         {options.map((opt) => {
@@ -334,12 +329,10 @@ export function ShippingSelector({
           )
         })}
       </div>
-      {!configured && (
-        <div className="flex items-center gap-2 mt-3 p-3 bg-blue-50 rounded-lg">
-          <MapPin className="w-4 h-4 text-blue-500 flex-shrink-0" />
-          <span className="text-xs text-blue-700">Envio a todo el pais. Ingresa tu codigo postal para cotizar con Andreani.</span>
-        </div>
-      )}
+      <div className="flex items-center gap-2 mt-3 p-3 bg-emerald-50 rounded-lg">
+        <Truck className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+        <span className="text-xs text-emerald-700">Envio a todo el pais. Envio gratis en compras superiores.</span>
+      </div>
     </div>
   )
 }
@@ -362,7 +355,6 @@ export async function handleMercadoPago(params: {
   itemId: string
   shippingAddress?: { postalCode: string; province: string; city: string; street: string; number: string; floor: string }
   shippingMethod?: string
-  shippingQuoteId?: string
   orderId?: string
 }) {
   const res = await fetch('/api/payments/create-preference', {
