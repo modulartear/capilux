@@ -49,6 +49,8 @@ import {
   ChevronUp,
   Save,
   StickyNote,
+  Sparkles,
+  Link2,
 } from 'lucide-react'
 
 interface Product {
@@ -101,6 +103,18 @@ interface Order {
   notes: string | null
   createdAt: string
   updatedAt: string
+}
+
+interface LandingPageItem {
+  id: string
+  slug: string
+  productId: string | null
+  productName: string
+  headline: string
+  heroImage1: string | null
+  isActive: boolean
+  createdAt: string
+  product?: { name: string; price: number; image1: string | null } | null
 }
 
 interface DashboardProps {
@@ -350,6 +364,61 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
   const [dropiLoading, setDropiLoading] = useState(false)
   const [dropiImporting, setDropiImporting] = useState<string | null>(null)
 
+  // Landing states
+  const [landings, setLandings] = useState<LandingPageItem[]>([])
+  const [generatingLanding, setGeneratingLanding] = useState<string | null>(null)
+  const [landingStep, setLandingStep] = useState('')
+  const [showLandingOverlay, setShowLandingOverlay] = useState(false)
+
+  // Fetch landings
+  const fetchLandings = useCallback(async () => {
+    try {
+      const res = await fetch('/api/landings')
+      if (res.ok) {
+        const data = await res.json()
+        setLandings(Array.isArray(data) ? data : [])
+      }
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const handleGenerateLanding = async (productId: string) => {
+    setGeneratingLanding(productId)
+    setShowLandingOverlay(true)
+    setLandingStep('Generando contenido con IA...')
+    try {
+      const res = await fetch('/api/landings/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId }),
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setLandingStep('Landing creada exitosamente!')
+        fetchLandings()
+        setTimeout(() => {
+          setShowLandingOverlay(false)
+          setGeneratingLanding(null)
+          setActiveTab('landings')
+        }, 1500)
+      } else {
+        const data = await res.json()
+        setLandingStep(`Error: ${data.error || 'No se pudo generar'}`)
+        setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null) }, 3000)
+      }
+    } catch {
+      setLandingStep('Error de conexion')
+      setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null) }, 3000)
+    }
+  }
+
+  const handleDeleteLanding = async (slug: string) => {
+    if (!confirm('Eliminar esta landing page?')) return
+    await fetch(`/api/landings/${slug}`, { method: 'DELETE' })
+    fetchLandings()
+  }
+
   // Fetch config
   const fetchConfig = useCallback(async () => {
     try {
@@ -458,8 +527,9 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
       fetchData()
       fetchConfig()
       fetchOrders()
+      fetchLandings()
     }
-  }, [authenticated, fetchData, fetchConfig, fetchOrders])
+  }, [authenticated, fetchData, fetchConfig, fetchOrders, fetchLandings])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -819,6 +889,7 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
               <TabsTrigger value="pedidos" className="gap-1.5 text-xs sm:text-sm"><ClipboardList className="w-4 h-4" />Ordenes</TabsTrigger>
               <TabsTrigger value="dropi" className="gap-1.5 text-xs sm:text-sm"><Download className="w-4 h-4" />Dropi</TabsTrigger>
               <TabsTrigger value="config" className="gap-1.5 text-xs sm:text-sm"><CreditCard className="w-4 h-4" /><span className="hidden sm:inline">MP</span></TabsTrigger>
+              <TabsTrigger value="landings" className="gap-1.5 text-xs sm:text-sm"><Sparkles className="w-4 h-4" />Landings</TabsTrigger>
             </TabsList>
           </div>
 
@@ -860,7 +931,11 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
                       </div>
                     </div>
                     <div className="flex border-t">
-                      <Button variant="ghost" size="sm" className="flex-1 rounded-none text-gray-500 hover:text-emerald-600 gap-1" onClick={() => handleToggleProduct(product)}>
+                      <Button variant="ghost" size="sm" className="flex-1 rounded-none text-violet-500 hover:text-violet-600 gap-1" onClick={() => handleGenerateLanding(product.id)} disabled={!!generatingLanding}>
+                        {generatingLanding === product.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                        Landing
+                      </Button>
+                      <Button variant="ghost" size="sm" className="flex-1 rounded-none text-gray-500 hover:text-emerald-600 gap-1 border-l" onClick={() => handleToggleProduct(product)}>
                         {product.isActive ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                         {product.isActive ? 'Ocultar' : 'Mostrar'}
                       </Button>
@@ -1442,8 +1517,94 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
               </CardContent>
             </Card>
           </TabsContent>
+          {/* Landings Tab */}
+          <TabsContent value="landings" className="space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h2 className="text-lg font-bold text-gray-800">Landing Pages ({landings.length})</h2>
+                <p className="text-gray-400 text-sm">Paginas de venta generadas por IA</p>
+              </div>
+              <Button variant="outline" className="gap-2" onClick={fetchLandings}>
+                <RefreshCw className="w-4 h-4" />Actualizar
+              </Button>
+            </div>
+
+            {landings.length === 0 ? (
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-16">
+                  <Sparkles className="w-16 h-16 text-gray-300 mb-4" />
+                  <p className="text-gray-400 text-lg mb-2">No hay landing pages creadas</p>
+                  <p className="text-gray-300 text-sm">Selecciona un producto y haz clic en "Landing" para crear una</p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                {landings.map((landing) => (
+                  <Card key={landing.id} className={`overflow-hidden ${!landing.isActive ? 'opacity-60' : ''}`}>
+                    <div className="flex gap-3 p-4">
+                      <div className="w-20 h-20 flex-shrink-0 rounded-lg overflow-hidden bg-gray-100">
+                        {landing.heroImage1 ? (
+                          <img src={landing.heroImage1} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center"><Sparkles className="w-8 h-8 text-violet-300" /></div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-gray-800 truncate text-sm">{landing.productName}</h3>
+                        <p className="text-gray-500 text-xs mt-1 line-clamp-1">{landing.headline}</p>
+                        <p className="text-gray-400 text-xs mt-1">{new Date(landing.createdAt).toLocaleDateString('es-AR')}</p>
+                      </div>
+                    </div>
+                    <div className="flex border-t">
+                      <Button variant="ghost" size="sm" className="flex-1 rounded-none text-emerald-500 hover:text-emerald-600 gap-1" onClick={() => window.open(`/landing/${landing.slug}`, '_blank')}>
+                        <ExternalLink className="w-3.5 h-3.5" />Ver
+                      </Button>
+                      <Button variant="ghost" size="sm" className="flex-1 rounded-none text-gray-500 hover:text-blue-600 gap-1 border-l" onClick={() => navigator.clipboard.writeText(`/landing/${landing.slug}`)}>
+                        <Link2 className="w-3.5 h-3.5" />Copiar Link
+                      </Button>
+                      <Button variant="ghost" size="sm" className="flex-1 rounded-none text-gray-500 hover:text-red-600 gap-1 border-l" onClick={() => handleDeleteLanding(landing.slug)}>
+                        <Trash2 className="w-3.5 h-3.5" />Eliminar
+                      </Button>
+                    </div>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </TabsContent>
+
         </Tabs>
       </main>
+
+      {/* Landing Generation Overlay */}
+      {showLandingOverlay && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-2xl p-8 max-w-md mx-4 text-center shadow-2xl"
+          >
+            <div className="w-16 h-16 bg-violet-100 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Sparkles className="w-8 h-8 text-violet-600 animate-pulse" />
+            </div>
+            <h3 className="text-xl font-bold text-gray-800 mb-2">Creando Landing Page</h3>
+            <p className="text-gray-500 text-sm mb-4">La IA esta generando tu pagina de venta...</p>
+            <div className="space-y-2 text-left">
+              <div className={`flex items-center gap-2 text-sm ${landingStep.includes('contenido') ? 'text-violet-600' : 'text-gray-400'}`}>
+                {landingStep.includes('contenido') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                Generando contenido persuasivo
+              </div>
+              <div className={`flex items-center gap-2 text-sm ${landingStep.includes('Imagen') || landingStep.includes('exitosamente') ? 'text-violet-600' : 'text-gray-400'}`}>
+                {landingStep.includes('Imagen') ? <Loader2 className="w-4 h-4 animate-spin" /> : landingStep.includes('exitosamente') ? <Check className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4" />}
+                Creando imagenes con IA
+              </div>
+              <div className={`flex items-center gap-2 text-sm ${landingStep.includes('exitosamente') ? 'text-emerald-600 font-semibold' : 'text-gray-400'}`}>
+                {landingStep.includes('exitosamente') ? <Check className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4" />}
+                Publicando landing page
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Product Form Dialog */}
       <Dialog open={showProductForm} onOpenChange={(open) => { if (!open) { setShowProductForm(false); setEditingProduct(null) } }}>

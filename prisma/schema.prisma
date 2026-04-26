@@ -19,6 +19,8 @@ model Product {
   dropiId     String?  @unique
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
+
+  landings    LandingPage[]
 }
 
 model Combo {
@@ -38,6 +40,30 @@ model Combo {
 model Config {
   key   String @id
   value String
+}
+
+model LandingPage {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  productId   String?
+  productName String
+  headline    String
+  subheadline String
+  problem     String
+  solution    String
+  benefits    String
+  testimonials String
+  faq         String
+  ctaText     String
+  ctaLink     String
+  heroImage1  String?
+  heroImage2  String?
+  urgencyText String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  product     Product? @relation(fields: [productId], references: [id])
 }
 
 model Order {
