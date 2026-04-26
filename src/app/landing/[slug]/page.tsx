@@ -49,6 +49,7 @@ interface LandingData {
   ctaLink: string
   heroImage1: string | null
   heroImage2: string | null
+  videoUrl: string | null
   urgencyText: string
   product?: {
     price: number
@@ -186,21 +187,36 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
         </div>
       </section>
 
-      {/* SECTION 2: VIDEO UGC PLACEHOLDER */}
+      {/* SECTION 2: UGC VIDEO */}
       <section className="py-12 sm:py-16 bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
             <p className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">Testimonio Real</p>
             <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-8">Mira lo que dicen nuestros clientes</h2>
-            <div className="relative aspect-video bg-gray-900 rounded-2xl overflow-hidden shadow-xl flex items-center justify-center group cursor-pointer">
-              <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/80 to-teal-900/80" />
-              <div className="relative z-10 text-center">
-                <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-white/30 transition-colors">
-                  <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+            <div className="relative aspect-video bg-gray-900 rounded-2xl overflow-hidden shadow-xl">
+              {data.videoUrl ? (
+                <video
+                  src={data.videoUrl}
+                  controls
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  className="w-full h-full object-cover rounded-2xl"
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/80 to-teal-900/80" />
+                  <div className="relative z-10 text-center">
+                    <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
+                      <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                    </div>
+                    <p className="text-white font-semibold text-lg">Video UGC generandose...</p>
+                    <p className="text-white/60 text-sm mt-1">La IA esta creando tu video testimonial</p>
+                    <p className="text-emerald-300 text-xs mt-3">Recarga la pagina en unos minutos para ver el video</p>
+                  </div>
                 </div>
-                <p className="text-white font-semibold text-lg">Video Testimonial</p>
-                <p className="text-white/60 text-sm mt-1">Clientes reales compartiendo su experiencia</p>
-              </div>
+              )}
             </div>
           </motion.div>
         </div>

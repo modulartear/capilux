@@ -58,6 +58,7 @@ model LandingPage {
   ctaLink     String
   heroImage1  String?
   heroImage2  String?
+  videoUrl    String?
   urgencyText String
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())

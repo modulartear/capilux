@@ -10,17 +10,7 @@ function slugify(text: string): string {
     .replace(/(^-|-$)+/g, '')
 }
 
-function buildFallbackCopy(productName: string, description: string, price: number): {
-  headline: string
-  subheadline: string
-  problem: string
-  solution: string
-  benefits: string
-  testimonials: string
-  faq: string
-  ctaText: string
-  urgencyText: string
-} {
+function buildFallbackCopy(productName: string, description: string, price: number) {
   const priceStr = `$${price.toLocaleString('es-AR', { minimumFractionDigits: 0 })}`
   return {
     headline: `${productName} - Transforma tu Salud Hoy`,
@@ -51,17 +41,7 @@ function buildFallbackCopy(productName: string, description: string, price: numb
   }
 }
 
-async function generateCopyWithAI(productName: string, description: string, price: number): Promise<{
-  headline: string
-  subheadline: string
-  problem: string
-  solution: string
-  benefits: string
-  testimonials: string
-  faq: string
-  ctaText: string
-  urgencyText: string
-} | null> {
+async function generateCopyWithAI(productName: string, description: string, price: number) {
   try {
     const ZAI = (await import('z-ai-web-dev-sdk')).default
     const zai = await ZAI.create()
@@ -104,7 +84,6 @@ El tono debe ser: emocional, confiable, cercano, enfocado en resultados reales. 
     const jsonMatch = content.match(/\{[\s\S]*\}/)
     if (jsonMatch) {
       const parsed = JSON.parse(jsonMatch[0])
-      // Validate required fields exist
       if (parsed.headline && parsed.subheadline && parsed.problem && parsed.solution) {
         return parsed
       }
@@ -141,6 +120,74 @@ async function generateImageWithAI(productName: string, description: string, typ
   }
 }
 
+// Generate UGC video with AI - runs async in background
+async function generateUGCVideo(landingId: string, productName: string, productImage: string | null) {
+  try {
+    const ZAI = (await import('z-ai-web-dev-sdk')).default
+    const zai = await ZAI.create()
+
+    const videoPrompt = `UGC style testimonial video. A real person talking to camera about ${productName}, excited and authentic, showing the product, natural lighting, selfie style, casual background like a bedroom or living room. Social media style content, engaging and genuine expression.`
+
+    // Use product image as start frame if available
+    let imageUrl: string | undefined
+    if (productImage && !productImage.startsWith('data:')) {
+      // It's a URL, use it directly
+      imageUrl = productImage
+    }
+
+    const task = await zai.video.generations.create({
+      prompt: videoPrompt,
+      image_url: imageUrl,
+      quality: 'speed',
+      duration: 5,
+      fps: 30,
+      size: '1344x768',
+    })
+
+    console.log(`Video generation task started: ${task.id} for landing ${landingId}`)
+
+    // Poll for result (video generation takes 2-5 minutes)
+    const maxPolls = 60
+    const pollInterval = 5000
+    let pollCount = 0
+
+    while (pollCount < maxPolls) {
+      await new Promise(resolve => setTimeout(resolve, pollInterval))
+      pollCount++
+
+      try {
+        const result = await zai.async.result.query(task.id)
+
+        if (result.task_status === 'SUCCESS') {
+          const videoUrl = result.video_result?.[0]?.url
+            || result.video_url
+            || result.url
+            || result.video
+
+          if (videoUrl) {
+            // Update landing page with the video URL
+            await db.landingPage.update({
+              where: { id: landingId },
+              data: { videoUrl },
+            })
+            console.log(`Video generated successfully for landing ${landingId}: ${videoUrl}`)
+            return
+          }
+        } else if (result.task_status === 'FAIL') {
+          console.log(`Video generation failed for landing ${landingId}`)
+          return
+        }
+      } catch (pollError) {
+        console.error(`Poll error for task ${task.id}:`, pollError)
+      }
+    }
+
+    console.log(`Video generation timed out for landing ${landingId}`)
+  } catch (error) {
+    console.error('Video generation error:', error)
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { productId } = await request.json()
@@ -149,7 +196,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'ProductId es requerido' }, { status: 400 })
     }
 
-    // Fetch product from real database
     const product = await db.product.findUnique({
       where: { id: productId },
     })
@@ -160,15 +206,14 @@ export async function POST(request: NextRequest) {
 
     const slug = slugify(`${product.name}-${Date.now()}`)
 
-    // Try AI copy, fall back to template
+    // Generate AI copy (with fallback)
     const copyResult = await generateCopyWithAI(product.name, product.description, product.price)
       || buildFallbackCopy(product.name, product.description, product.price)
 
-    // Try AI images in background (non-blocking)
+    // Generate AI images in parallel
     let heroImage1 = product.image1 || null
     let heroImage2 = product.image2 || null
 
-    // Generate images in parallel (fire and forget with fallback)
     const [aiImg1, aiImg2] = await Promise.allSettled([
       generateImageWithAI(product.name, product.description, 'hero'),
       generateImageWithAI(product.name, product.description, 'lifestyle'),
@@ -177,7 +222,7 @@ export async function POST(request: NextRequest) {
     if (aiImg1.status === 'fulfilled' && aiImg1.value) heroImage1 = aiImg1.value
     if (aiImg2.status === 'fulfilled' && aiImg2.value) heroImage2 = aiImg2.value
 
-    // Save to database
+    // Save landing to database (without video yet)
     const landing = await db.landingPage.create({
       data: {
         slug,
@@ -199,7 +244,14 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    return NextResponse.json({ success: true, landing })
+    // Start video generation in background (fire and forget)
+    // Use the first hero image for video generation
+    const videoSourceImage = heroImage1 || product.image1 || null
+    generateUGCVideo(landing.id, product.name, videoSourceImage).catch(e => {
+      console.error('Background video generation failed:', e)
+    })
+
+    return NextResponse.json({ success: true, landing, videoGenerating: true })
   } catch (error: any) {
     console.error('Error generating landing:', error)
     return NextResponse.json({ error: error.message || 'Error al generar la landing' }, { status: 500 })
