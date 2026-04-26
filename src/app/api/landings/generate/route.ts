@@ -120,70 +120,51 @@ async function generateImageWithAI(productName: string, description: string, typ
   }
 }
 
-// Generate UGC video with AI - runs async in background
-async function generateUGCVideo(landingId: string, productName: string, productImage: string | null) {
+// Start UGC video generation - just creates the task and saves ID
+// Client polls /api/video/status?landingId=xxx for progress
+async function startUGCVideoTask(landingId: string, productName: string) {
   try {
     const ZAI = (await import('z-ai-web-dev-sdk')).default
     const zai = await ZAI.create()
 
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || ''
-    const avatarUrl = `${siteUrl}/ugc-avatar.jpg`
+    // Read avatar as base64 (more reliable than URL for the video API)
+    const fs = await import('fs')
+    const path = await import('path')
+    const avatarPath = path.join(process.cwd(), 'public', 'ugc-avatar.jpg')
+    let avatarBase64: string | undefined
+    try {
+      const imgBuffer = fs.readFileSync(avatarPath)
+      avatarBase64 = `data:image/jpeg;base64,${imgBuffer.toString('base64')}`
+    } catch {
+      // Fallback to URL if file not found
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || ''
+      avatarBase64 = `${siteUrl}/ugc-avatar.jpg`
+    }
 
     const videoPrompt = `Video estilo UGC testimonial en español argentino (rioplatense). Una persona real hablando a cámara sobre ${productName}, entusiasmada y auténtica, mostrando el producto con confianza. Iluminación natural, estilo selfie, fondo casual como un dormitorio o living. Contenido para redes sociales, expresión genuina y cercana. La persona dice algo como: "Mirá, desde que uso ${productName} mi vida cambió totalmente, lo recomiendo al cien por ciento, no lo duden." Tonado argentino, vocabulario rioplatense (che, mirá, re bien, barbaro, copado).`
 
-    // Always use the avatar as the main image for consistent brand identity
-    let imageUrl: string | undefined = avatarUrl
-
     const task = await zai.video.generations.create({
       prompt: videoPrompt,
-      image_url: imageUrl,
+      image_url: avatarBase64,
       quality: 'speed',
       duration: 5,
       fps: 30,
       size: '1344x768',
     })
 
-    console.log(`Video generation task started: ${task.id} for landing ${landingId}`)
+    console.log(`Video task created: ${task.id} for landing ${landingId}`)
 
-    // Poll for result (video generation takes 2-5 minutes)
-    const maxPolls = 60
-    const pollInterval = 5000
-    let pollCount = 0
+    // Save task ID in Config table so client can poll for it
+    await db.config.upsert({
+      where: { key: `video_task_${landingId}` },
+      update: { value: task.id },
+      create: { key: `video_task_${landingId}`, value: task.id },
+    })
 
-    while (pollCount < maxPolls) {
-      await new Promise(resolve => setTimeout(resolve, pollInterval))
-      pollCount++
-
-      try {
-        const result = await zai.async.result.query(task.id)
-
-        if (result.task_status === 'SUCCESS') {
-          const videoUrl = result.video_result?.[0]?.url
-            || result.video_url
-            || result.url
-            || result.video
-
-          if (videoUrl) {
-            // Update landing page with the video URL
-            await db.landingPage.update({
-              where: { id: landingId },
-              data: { videoUrl },
-            })
-            console.log(`Video generated successfully for landing ${landingId}: ${videoUrl}`)
-            return
-          }
-        } else if (result.task_status === 'FAIL') {
-          console.log(`Video generation failed for landing ${landingId}`)
-          return
-        }
-      } catch (pollError) {
-        console.error(`Poll error for task ${task.id}:`, pollError)
-      }
-    }
-
-    console.log(`Video generation timed out for landing ${landingId}`)
+    return task.id
   } catch (error) {
-    console.error('Video generation error:', error)
+    console.error('Video task creation error:', error)
+    return null
   }
 }
 
@@ -243,14 +224,10 @@ export async function POST(request: NextRequest) {
       },
     })
 
-    // Start video generation in background (fire and forget)
-    // Use the first hero image for video generation
-    const videoSourceImage = heroImage1 || product.image1 || null
-    generateUGCVideo(landing.id, product.name, videoSourceImage).catch(e => {
-      console.error('Background video generation failed:', e)
-    })
+    // Start video generation task (saves task ID in DB, client polls for result)
+    const videoTaskId = await startUGCVideoTask(landing.id, product.name)
 
-    return NextResponse.json({ success: true, landing, videoGenerating: true })
+    return NextResponse.json({ success: true, landing, videoGenerating: !!videoTaskId, videoTaskId })
   } catch (error: any) {
     console.error('Error generating landing:', error)
     return NextResponse.json({ error: error.message || 'Error al generar la landing' }, { status: 500 })

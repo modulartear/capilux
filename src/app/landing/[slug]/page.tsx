@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion } from 'framer-motion'
 import {
   Star,
@@ -67,7 +67,46 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
   const [benefits, setBenefits] = useState<Benefit[]>([])
   const [testimonials, setTestimonials] = useState<Testimonial[]>([])
   const [faq, setFaq] = useState<FAQItem[]>([])
+  const [videoStatus, setVideoStatus] = useState<'idle' | 'processing' | 'done' | 'failed'>('idle')
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const pollCountRef = useRef(0)
 
+  // Check video status via API
+  const checkVideoStatus = useCallback(async (landingId: string) => {
+    try {
+      const res = await fetch(`/api/video/status?landingId=${landingId}`)
+      const result = await res.json()
+
+      if (result.status === 'done' && result.videoUrl) {
+        setData(prev => prev ? { ...prev, videoUrl: result.videoUrl } : prev)
+        setVideoStatus('done')
+        if (pollRef.current) clearInterval(pollRef.current)
+        return
+      }
+
+      if (result.status === 'failed') {
+        setVideoStatus('failed')
+        if (pollRef.current) clearInterval(pollRef.current)
+        return
+      }
+
+      // Still processing or not_started
+      if (result.status === 'processing') {
+        setVideoStatus('processing')
+      }
+
+      // Stop polling after 5 minutes (60 polls x 5s = 300s)
+      pollCountRef.current += 1
+      if (pollCountRef.current >= 60) {
+        if (pollRef.current) clearInterval(pollRef.current)
+        setVideoStatus('failed')
+      }
+    } catch {
+      // Silently ignore poll errors
+    }
+  }, [])
+
+  // Start video polling when landing loads without video
   useEffect(() => {
     params.then(({ slug }) => {
       fetch(`/api/landings/${slug}`)
@@ -80,12 +119,28 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
             try { setBenefits(JSON.parse(landing.benefits)) } catch { setBenefits([]) }
             try { setTestimonials(JSON.parse(landing.testimonials)) } catch { setTestimonials([]) }
             try { setFaq(JSON.parse(landing.faq)) } catch { setFaq([]) }
+
+            // If no video yet, start polling
+            if (!landing.videoUrl && landing.id) {
+              pollCountRef.current = 0
+              setVideoStatus('processing')
+              // Check immediately
+              checkVideoStatus(landing.id)
+              // Then poll every 5 seconds
+              pollRef.current = setInterval(() => checkVideoStatus(landing.id), 5000)
+            } else if (landing.videoUrl) {
+              setVideoStatus('done')
+            }
           }
         })
         .catch(() => setError('Error al cargar la landing page'))
         .finally(() => setLoading(false))
     })
-  }, [params])
+
+    return () => {
+      if (pollRef.current) clearInterval(pollRef.current)
+    }
+  }, [params, checkVideoStatus])
 
   if (loading) {
     return (
@@ -204,16 +259,25 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
                   playsInline
                   className="w-full h-full object-cover rounded-2xl"
                 />
+              ) : videoStatus === 'processing' ? (
+                <div className="w-full h-full flex items-center justify-center">
+                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/80 to-teal-900/80" />
+                  <div className="relative z-10 text-center">
+                    <Loader2 className="w-12 h-12 text-emerald-400 animate-spin mx-auto mb-4" />
+                    <p className="text-white font-semibold text-lg">Generando video UGC...</p>
+                    <p className="text-white/60 text-sm mt-1">La IA esta creando tu video testimonial</p>
+                    <p className="text-emerald-300 text-xs mt-3">El video aparecera automaticamente cuando este listo</p>
+                  </div>
+                </div>
               ) : (
                 <div className="w-full h-full flex items-center justify-center">
                   <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/80 to-teal-900/80" />
                   <div className="relative z-10 text-center">
-                    <div className="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4 animate-pulse">
-                      <svg className="w-8 h-8 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                    <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4">
+                      <svg className="w-7 h-7 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
                     </div>
-                    <p className="text-white font-semibold text-lg">Video UGC generandose...</p>
-                    <p className="text-white/60 text-sm mt-1">La IA esta creando tu video testimonial</p>
-                    <p className="text-emerald-300 text-xs mt-3">Recarga la pagina en unos minutos para ver el video</p>
+                    <p className="text-white font-semibold text-lg">Video UGC</p>
+                    <p className="text-white/60 text-sm mt-1">El video se generara con la proxima creacion de landing</p>
                   </div>
                 </div>
               )}
