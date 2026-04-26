@@ -126,14 +126,13 @@ async function generateUGCVideo(landingId: string, productName: string, productI
     const ZAI = (await import('z-ai-web-dev-sdk')).default
     const zai = await ZAI.create()
 
-    const videoPrompt = `UGC style testimonial video. A real person talking to camera about ${productName}, excited and authentic, showing the product, natural lighting, selfie style, casual background like a bedroom or living room. Social media style content, engaging and genuine expression.`
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || ''
+    const avatarUrl = `${siteUrl}/ugc-avatar.jpg`
 
-    // Use product image as start frame if available
-    let imageUrl: string | undefined
-    if (productImage && !productImage.startsWith('data:')) {
-      // It's a URL, use it directly
-      imageUrl = productImage
-    }
+    const videoPrompt = `Video estilo UGC testimonial en español argentino (rioplatense). Una persona real hablando a cámara sobre ${productName}, entusiasmada y auténtica, mostrando el producto con confianza. Iluminación natural, estilo selfie, fondo casual como un dormitorio o living. Contenido para redes sociales, expresión genuina y cercana. La persona dice algo como: "Mirá, desde que uso ${productName} mi vida cambió totalmente, lo recomiendo al cien por ciento, no lo duden." Tonado argentino, vocabulario rioplatense (che, mirá, re bien, barbaro, copado).`
+
+    // Always use the avatar as the main image for consistent brand identity
+    let imageUrl: string | undefined = avatarUrl
 
     const task = await zai.video.generations.create({
       prompt: videoPrompt,
