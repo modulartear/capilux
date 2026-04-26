@@ -120,46 +120,89 @@ async function generateImageWithAI(productName: string, description: string, typ
   }
 }
 
-// Start UGC video generation - just creates the task and saves ID
+// Start UGC video generation + TTS audio - creates tasks and saves IDs
 // Client polls /api/video/status?landingId=xxx for progress
-async function startUGCVideoTask(landingId: string, productName: string) {
+async function startUGCVideoTask(landingId: string, productName: string, productImage: string | null, productDescription: string) {
   try {
     const ZAI = (await import('z-ai-web-dev-sdk')).default
     const zai = await ZAI.create()
-
-    // Read avatar as base64 (more reliable than URL for the video API)
     const fs = await import('fs')
     const path = await import('path')
-    const avatarPath = path.join(process.cwd(), 'public', 'ugc-avatar.jpg')
-    let avatarBase64: string | undefined
-    try {
-      const imgBuffer = fs.readFileSync(avatarPath)
-      avatarBase64 = `data:image/jpeg;base64,${imgBuffer.toString('base64')}`
-    } catch {
-      // Fallback to URL if file not found
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || ''
-      avatarBase64 = `${siteUrl}/ugc-avatar.jpg`
+
+    // Use product image for the video (show the actual product)
+    let videoImage: string | undefined
+    if (productImage) {
+      if (productImage.startsWith('data:')) {
+        videoImage = productImage
+      } else {
+        // Try to fetch and convert to base64
+        try {
+          const imgRes = await fetch(productImage)
+          if (imgRes.ok) {
+            const imgBuf = Buffer.from(await imgRes.arrayBuffer())
+            videoImage = `data:image/jpeg;base64,${imgBuf.toString('base64')}`
+          }
+        } catch {
+          videoImage = productImage
+        }
+      }
+    }
+    // Fallback to avatar if no product image
+    if (!videoImage) {
+      const avatarPath = path.join(process.cwd(), 'public', 'ugc-avatar.jpg')
+      try {
+        const imgBuffer = fs.readFileSync(avatarPath)
+        videoImage = `data:image/jpeg;base64,${imgBuffer.toString('base64')}`
+      } catch {
+        const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || ''
+        videoImage = `${siteUrl}/ugc-avatar.jpg`
+      }
     }
 
-    const videoPrompt = `Video estilo UGC testimonial en español argentino (rioplatense). Una persona real hablando a cámara sobre ${productName}, entusiasmada y auténtica, mostrando el producto con confianza. Iluminación natural, estilo selfie, fondo casual como un dormitorio o living. Contenido para redes sociales, expresión genuina y cercana. La persona dice algo como: "Mirá, desde que uso ${productName} mi vida cambió totalmente, lo recomiendo al cien por ciento, no lo duden." Tonado argentino, vocabulario rioplatense (che, mirá, re bien, barbaro, copado).`
+    const videoPrompt = `Video estilo UGC testimonial en español argentino. Una mujer joven argentina mostrando y explicando el producto ${productName}. Sostiene el producto frente a la camara, lo muestra de cerca con orgullo, gira el frasco para ver las etiquetas. Iluminacion natural, estilo selfie, fondo living moderno. Expresion genuina y entusiasmada. Redes sociales style.`
 
+    // Create video task
     const task = await zai.video.generations.create({
       prompt: videoPrompt,
-      image_url: avatarBase64,
+      image_url: videoImage,
       quality: 'speed',
       duration: 5,
       fps: 24,
       size: '1024x576',
     })
-
     console.log(`Video task created: ${task.id} for landing ${landingId}`)
 
-    // Save task ID in Config table so client can poll for it
+    // Save video task ID
     await db.config.upsert({
       where: { key: `video_task_${landingId}` },
       update: { value: task.id },
       create: { key: `video_task_${landingId}`, value: task.id },
     })
+
+    // Generate TTS audio with Argentine female voice
+    try {
+      const ttsText = `Hola che! Soy Mati y les quiero contar mi experiencia con ${productName}. Desde que lo empece a usar note un cambio barbaro en mi dia a dia. ${productDescription.split('.')[0]}. Lo uso hace dos meses y te juro que no puedo mas sin el. Lo recomiendo al cien por ciento, no lo duden, es re copado.`.slice(0, 1024)
+
+      const audioResponse = await zai.audio.tts.create({
+        input: ttsText,
+        voice: 'chuichui',
+        speed: 1.0,
+        response_format: 'wav',
+        stream: false,
+      })
+
+      const audioBuffer = Buffer.from(new Uint8Array(await audioResponse.arrayBuffer()))
+      const audioBase64 = `data:audio/wav;base64,${audioBuffer.toString('base64')}`
+
+      // Save audio directly to landing
+      await db.landingPage.update({
+        where: { id: landingId },
+        data: { audioUrl: audioBase64 },
+      })
+      console.log(`TTS audio saved for landing ${landingId} (${audioBuffer.length} bytes)`)
+    } catch (ttsError) {
+      console.error('TTS generation failed:', ttsError)
+    }
 
     return task.id
   } catch (error) {
@@ -225,7 +268,7 @@ export async function POST(request: NextRequest) {
     })
 
     // Start video generation task (saves task ID in DB, client polls for result)
-    const videoTaskId = await startUGCVideoTask(landing.id, product.name)
+    const videoTaskId = await startUGCVideoTask(landing.id, product.name, heroImage1 || product.image1, product.description)
 
     return NextResponse.json({ success: true, landing, videoGenerating: !!videoTaskId, videoTaskId })
   } catch (error: any) {

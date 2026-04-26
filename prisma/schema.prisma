@@ -59,6 +59,7 @@ model LandingPage {
   heroImage1  String?
   heroImage2  String?
   videoUrl    String?
+  audioUrl    String?
   urgencyText String
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())

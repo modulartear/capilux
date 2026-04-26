@@ -12,16 +12,21 @@ export async function GET(request: NextRequest) {
     // Check if video already exists in the landing
     const landing = await db.landingPage.findUnique({
       where: { id: landingId },
-      select: { videoUrl: true },
+      select: { videoUrl: true, audioUrl: true },
     })
 
     if (!landing) {
       return NextResponse.json({ error: 'Landing no encontrada' }, { status: 404 })
     }
 
-    // If video already generated, return it
+    // If video already generated, return it with audio
     if (landing.videoUrl) {
-      return NextResponse.json({ status: 'done', videoUrl: landing.videoUrl })
+      return NextResponse.json({ status: 'done', videoUrl: landing.videoUrl, audioUrl: landing.audioUrl })
+    }
+
+    // Return audio even if video is still processing
+    if (landing.audioUrl) {
+      // Continue to check video status below, but include audioUrl
     }
 
     // Look up the task ID from Config table
@@ -60,7 +65,7 @@ export async function GET(request: NextRequest) {
           where: { key: `video_task_${landingId}` },
         }).catch(() => {})
 
-        return NextResponse.json({ status: 'done', videoUrl })
+        return NextResponse.json({ status: 'done', videoUrl, audioUrl: landing.audioUrl })
       }
     }
 
@@ -70,11 +75,11 @@ export async function GET(request: NextRequest) {
         where: { key: `video_task_${landingId}` },
       }).catch(() => {})
 
-      return NextResponse.json({ status: 'failed' })
+      return NextResponse.json({ status: 'failed', audioUrl: landing.audioUrl })
     }
 
     // Still processing
-    return NextResponse.json({ status: 'processing' })
+    return NextResponse.json({ status: 'processing', audioUrl: landing.audioUrl })
   } catch (error: any) {
     console.error('Video status check error:', error)
     return NextResponse.json({ status: 'error', error: error.message }, { status: 500 })

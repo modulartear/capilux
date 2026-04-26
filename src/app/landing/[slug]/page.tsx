@@ -16,6 +16,7 @@ import {
   Clock,
   ArrowRight,
   Loader2,
+  Volume2,
 } from 'lucide-react'
 
 interface Testimonial {
@@ -50,6 +51,7 @@ interface LandingData {
   heroImage1: string | null
   heroImage2: string | null
   videoUrl: string | null
+  audioUrl: string | null
   urgencyText: string
   product?: {
     price: number
@@ -68,8 +70,10 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
   const [testimonials, setTestimonials] = useState<Testimonial[]>([])
   const [faq, setFaq] = useState<FAQItem[]>([])
   const [videoStatus, setVideoStatus] = useState<'idle' | 'processing' | 'done' | 'failed'>('idle')
+  const [audioUrl, setAudioUrl] = useState<string | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollCountRef = useRef(0)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
 
   // Check video status via API
   const checkVideoStatus = useCallback(async (landingId: string) => {
@@ -77,15 +81,22 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
       const res = await fetch(`/api/video/status?landingId=${landingId}`)
       const result = await res.json()
 
+      // Always update audio URL when available
+      if (result.audioUrl && !audioUrl) {
+        setAudioUrl(result.audioUrl)
+      }
+
       if (result.status === 'done' && result.videoUrl) {
         setData(prev => prev ? { ...prev, videoUrl: result.videoUrl } : prev)
         setVideoStatus('done')
+        if (result.audioUrl) setAudioUrl(result.audioUrl)
         if (pollRef.current) clearInterval(pollRef.current)
         return
       }
 
       if (result.status === 'failed') {
         setVideoStatus('failed')
+        if (result.audioUrl) setAudioUrl(result.audioUrl)
         if (pollRef.current) clearInterval(pollRef.current)
         return
       }
@@ -93,6 +104,7 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
       // Still processing or not_started
       if (result.status === 'processing') {
         setVideoStatus('processing')
+        if (result.audioUrl && !audioUrl) setAudioUrl(result.audioUrl)
       }
 
       // Stop polling after 5 minutes (100 polls x 3s = 300s)
@@ -119,6 +131,7 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
             try { setBenefits(JSON.parse(landing.benefits)) } catch { setBenefits([]) }
             try { setTestimonials(JSON.parse(landing.testimonials)) } catch { setTestimonials([]) }
             try { setFaq(JSON.parse(landing.faq)) } catch { setFaq([]) }
+            if (landing.audioUrl) setAudioUrl(landing.audioUrl)
 
             // If no video yet, start polling
             if (!landing.videoUrl && landing.id) {
@@ -242,18 +255,52 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
         </div>
       </section>
 
-      {/* SECTION 2: UGC VIDEO */}
+      {/* SECTION 2: UGC VIDEO + AUDIO */}
       <section className="py-12 sm:py-16 bg-gray-50">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
             <p className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">Testimonio Real</p>
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-8">Mira lo que dicen nuestros clientes</h2>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-8">Escucha y mira lo que dicen nuestros clientes</h2>
+
+            {/* Audio player */}
+            {audioUrl && (
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mb-6 bg-white rounded-2xl p-4 shadow-md border border-emerald-100"
+              >
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => {
+                      if (audioRef.current) {
+                        if (audioRef.current.paused) {
+                          audioRef.current.play()
+                        } else {
+                          audioRef.current.pause()
+                        }
+                      }
+                    }}
+                    className="w-12 h-12 bg-emerald-600 hover:bg-emerald-700 rounded-full flex items-center justify-center shadow-lg flex-shrink-0 transition-colors"
+                  >
+                    <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </button>
+                  <div className="flex-1 text-left">
+                    <p className="text-sm font-semibold text-gray-800">Audio testimonial - Voz real</p>
+                    <p className="text-xs text-gray-500">Escucha la experiencia de nuestra clienta</p>
+                  </div>
+                  <Volume2 className="w-5 h-5 text-emerald-500" />
+                </div>
+                <audio ref={audioRef} src={audioUrl} preload="auto" className="w-full mt-3" controls />
+              </motion.div>
+            )}
+
             <div className="relative aspect-video bg-gray-900 rounded-2xl overflow-hidden shadow-xl">
               {data.videoUrl ? (
                 <video
                   src={data.videoUrl}
                   controls
-                  autoPlay
                   muted
                   loop
                   playsInline
@@ -265,8 +312,9 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
                   <div className="relative z-10 text-center">
                     <Loader2 className="w-12 h-12 text-emerald-400 animate-spin mx-auto mb-4" />
                     <p className="text-white font-semibold text-lg">Generando video UGC...</p>
-                    <p className="text-white/60 text-sm mt-1">La IA esta creando tu video testimonial</p>
-                    <p className="text-emerald-300 text-xs mt-3">El video aparecera automaticamente cuando este listo</p>
+                    <p className="text-white/60 text-sm mt-1">La IA esta creando tu video con el producto</p>
+                    {audioUrl && <p className="text-emerald-300 text-xs mt-3">Mientras tanto, escucha el audio testimonial abajo</p>}
+                    {!audioUrl && <p className="text-emerald-300 text-xs mt-3">El video aparecera automaticamente cuando este listo</p>}
                   </div>
                 </div>
               ) : (
