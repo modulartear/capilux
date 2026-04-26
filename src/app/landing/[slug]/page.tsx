@@ -95,9 +95,9 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
         setVideoStatus('processing')
       }
 
-      // Stop polling after 5 minutes (60 polls x 5s = 300s)
+      // Stop polling after 5 minutes (100 polls x 3s = 300s)
       pollCountRef.current += 1
-      if (pollCountRef.current >= 60) {
+      if (pollCountRef.current >= 100) {
         if (pollRef.current) clearInterval(pollRef.current)
         setVideoStatus('failed')
       }
@@ -124,10 +124,10 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
             if (!landing.videoUrl && landing.id) {
               pollCountRef.current = 0
               setVideoStatus('processing')
-              // Check immediately
-              checkVideoStatus(landing.id)
-              // Then poll every 5 seconds
-              pollRef.current = setInterval(() => checkVideoStatus(landing.id), 5000)
+              // First check after 8s (video usually takes 30-40s)
+              setTimeout(() => checkVideoStatus(landing.id), 8000)
+              // Then poll every 3 seconds
+              pollRef.current = setInterval(() => checkVideoStatus(landing.id), 3000)
             } else if (landing.videoUrl) {
               setVideoStatus('done')
             }

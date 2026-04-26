@@ -148,8 +148,8 @@ async function startUGCVideoTask(landingId: string, productName: string) {
       image_url: avatarBase64,
       quality: 'speed',
       duration: 5,
-      fps: 30,
-      size: '1344x768',
+      fps: 24,
+      size: '1024x576',
     })
 
     console.log(`Video task created: ${task.id} for landing ${landingId}`)
