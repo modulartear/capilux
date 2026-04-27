@@ -3,6 +3,7 @@ import { join } from 'path'
 import { PrismaClient } from '@prisma/client'
 
 // Force load .env to override system DATABASE_URL (container sets file: custom.db)
+let DATABASE_URL = process.env.DATABASE_URL || ''
 try {
   const envPath = join(process.cwd(), '.env')
   const envContent = readFileSync(envPath, 'utf-8')
@@ -18,6 +19,7 @@ try {
           value = value.slice(1, -1)
         }
         process.env[key] = value
+        if (key === 'DATABASE_URL') DATABASE_URL = value
       }
     }
   }
@@ -31,6 +33,11 @@ export const db =
   globalForPrisma.prisma ??
   new PrismaClient({
     log: ['query'],
+    datasources: {
+      db: {
+        url: DATABASE_URL,
+      },
+    },
   })
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = db
