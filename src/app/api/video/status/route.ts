@@ -12,74 +12,132 @@ export async function GET(request: NextRequest) {
     // Check if video already exists in the landing
     const landing = await db.landingPage.findUnique({
       where: { id: landingId },
-      select: { videoUrl: true, audioUrl: true },
     })
 
     if (!landing) {
       return NextResponse.json({ error: 'Landing no encontrada' }, { status: 404 })
     }
 
-    // If video already generated, return it with audio
+    // If video already generated, return full landing data
     if (landing.videoUrl) {
-      return NextResponse.json({ status: 'done', videoUrl: landing.videoUrl, audioUrl: landing.audioUrl })
+      return NextResponse.json({
+        status: 'done',
+        videoUrl: landing.videoUrl,
+        audioUrl: landing.audioUrl,
+        heroImage1: landing.heroImage1,
+        heroImage2: landing.heroImage2,
+        landing: {
+          headline: landing.headline,
+          subheadline: landing.subheadline,
+          problem: landing.problem,
+          solution: landing.solution,
+          benefits: landing.benefits,
+          testimonials: landing.testimonials,
+          faq: landing.faq,
+          ctaText: landing.ctaText,
+          urgencyText: landing.urgencyText,
+        },
+      })
     }
 
-    // Return audio even if video is still processing
-    if (landing.audioUrl) {
-      // Continue to check video status below, but include audioUrl
-    }
-
-    // Look up the task ID from Config table
-    const taskConfig = await db.config.findUnique({
-      where: { key: `video_task_${landingId}` },
+    // Check if background media processing is done
+    const mediaDone = await db.config.findUnique({
+      where: { key: `media_done_${landingId}` },
     })
 
-    if (!taskConfig) {
-      return NextResponse.json({ status: 'not_started' })
+    const response: any = {
+      status: 'processing',
+      audioUrl: landing.audioUrl || null,
+      heroImage1: landing.heroImage1 || null,
+      heroImage2: landing.heroImage2 || null,
     }
 
-    const taskId = taskConfig.value
-
-    // Poll the video task once
-    const ZAI = (await import('z-ai-web-dev-sdk')).default
-    const zai = await ZAI.create()
-
-    const result = await zai.async.result.query(taskId)
-
-    if (result.task_status === 'SUCCESS') {
-      const videoUrl =
-        result.video_result?.[0]?.url ||
-        result.video_url ||
-        result.url ||
-        result.video
-
-      if (videoUrl) {
-        // Update landing page with the video URL
-        await db.landingPage.update({
-          where: { id: landingId },
-          data: { videoUrl },
-        })
-
-        // Clean up task ID from Config
-        await db.config.delete({
-          where: { key: `video_task_${landingId}` },
-        }).catch(() => {})
-
-        return NextResponse.json({ status: 'done', videoUrl, audioUrl: landing.audioUrl })
+    // Return updated copy if AI copy has been applied (check if headline has emoji = AI generated)
+    if (landing.headline && /\p{Emoji}/u.test(landing.headline)) {
+      response.landing = {
+        headline: landing.headline,
+        subheadline: landing.subheadline,
+        problem: landing.problem,
+        solution: landing.solution,
+        benefits: landing.benefits,
+        testimonials: landing.testimonials,
+        faq: landing.faq,
+        ctaText: landing.ctaText,
+        urgencyText: landing.urgencyText,
       }
     }
 
-    if (result.task_status === 'FAIL') {
-      // Clean up failed task
-      await db.config.delete({
+    if (mediaDone) {
+      // Media images + audio done, video may still be processing
+      // Look up the video task ID
+      const taskConfig = await db.config.findUnique({
         where: { key: `video_task_${landingId}` },
-      }).catch(() => {})
+      })
 
-      return NextResponse.json({ status: 'failed', audioUrl: landing.audioUrl })
+      if (!taskConfig) {
+        // No video task created yet, media still in progress
+        return NextResponse.json({ ...response, status: 'media_processing' })
+      }
+
+      const taskId = taskConfig.value
+
+      // Poll the video task once
+      const ZAI = (await import('z-ai-web-dev-sdk')).default
+      const zai = await ZAI.create()
+
+      const result = await zai.async.result.query(taskId)
+
+      if (result.task_status === 'SUCCESS') {
+        const videoUrl =
+          result.video_result?.[0]?.url ||
+          result.video_url ||
+          result.url ||
+          result.video
+
+        if (videoUrl) {
+          await db.landingPage.update({
+            where: { id: landingId },
+            data: { videoUrl },
+          })
+
+          // Clean up task configs
+          await db.config.delete({ where: { key: `video_task_${landingId}` } }).catch(() => {})
+          await db.config.delete({ where: { key: `media_done_${landingId}` } }).catch(() => {})
+
+          return NextResponse.json({
+            status: 'done',
+            videoUrl,
+            audioUrl: landing.audioUrl,
+            heroImage1: landing.heroImage1,
+            heroImage2: landing.heroImage2,
+            landing: {
+              headline: landing.headline,
+              subheadline: landing.subheadline,
+              problem: landing.problem,
+              solution: landing.solution,
+              benefits: landing.benefits,
+              testimonials: landing.testimonials,
+              faq: landing.faq,
+              ctaText: landing.ctaText,
+              urgencyText: landing.urgencyText,
+            },
+          })
+        }
+      }
+
+      if (result.task_status === 'FAIL') {
+        await db.config.delete({ where: { key: `video_task_${landingId}` } }).catch(() => {})
+        await db.config.delete({ where: { key: `media_done_${landingId}` } }).catch(() => {})
+
+        return NextResponse.json({ ...response, status: 'video_failed' })
+      }
+
+      // Video still processing
+      return NextResponse.json({ ...response, status: 'video_processing' })
     }
 
-    // Still processing
-    return NextResponse.json({ status: 'processing', audioUrl: landing.audioUrl })
+    // Background media not done yet
+    return NextResponse.json({ ...response, status: 'media_processing' })
   } catch (error: any) {
     console.error('Video status check error:', error)
     return NextResponse.json({ status: 'error', error: error.message }, { status: 500 })

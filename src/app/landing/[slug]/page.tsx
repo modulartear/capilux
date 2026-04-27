@@ -75,37 +75,58 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
   const pollCountRef = useRef(0)
   const audioRef = useRef<HTMLAudioElement | null>(null)
 
-  // Check video status via API
+  // Check video status via API — also picks up new images, audio, and AI copy
   const checkVideoStatus = useCallback(async (landingId: string) => {
     try {
       const res = await fetch(`/api/video/status?landingId=${landingId}`)
       const result = await res.json()
 
-      // Always update audio URL when available
-      if (result.audioUrl && !audioUrl) {
-        setAudioUrl(result.audioUrl)
+      // Update audio URL when available
+      if (result.audioUrl) setAudioUrl(result.audioUrl)
+
+      // Update images when they become available
+      if (result.heroImage1 || result.heroImage2) {
+        setData(prev => prev ? {
+          ...prev,
+          ...(result.heroImage1 ? { heroImage1: result.heroImage1 } : {}),
+          ...(result.heroImage2 ? { heroImage2: result.heroImage2 } : {}),
+        } : prev)
+      }
+
+      // Update AI-generated copy when ready
+      if (result.landing) {
+        setData(prev => prev ? {
+          ...prev,
+          headline: result.landing.headline,
+          subheadline: result.landing.subheadline,
+          problem: result.landing.problem,
+          solution: result.landing.solution,
+          benefits: result.landing.benefits,
+          testimonials: result.landing.testimonials,
+          faq: result.landing.faq,
+          ctaText: result.landing.ctaText,
+          urgencyText: result.landing.urgencyText,
+        } : prev)
+        try { setBenefits(JSON.parse(result.landing.benefits)) } catch {}
+        try { setTestimonials(JSON.parse(result.landing.testimonials)) } catch {}
+        try { setFaq(JSON.parse(result.landing.faq)) } catch {}
       }
 
       if (result.status === 'done' && result.videoUrl) {
         setData(prev => prev ? { ...prev, videoUrl: result.videoUrl } : prev)
         setVideoStatus('done')
-        if (result.audioUrl) setAudioUrl(result.audioUrl)
         if (pollRef.current) clearInterval(pollRef.current)
         return
       }
 
-      if (result.status === 'failed') {
+      if (result.status === 'failed' || result.status === 'video_failed') {
         setVideoStatus('failed')
-        if (result.audioUrl) setAudioUrl(result.audioUrl)
         if (pollRef.current) clearInterval(pollRef.current)
         return
       }
 
-      // Still processing or not_started
-      if (result.status === 'processing') {
-        setVideoStatus('processing')
-        if (result.audioUrl && !audioUrl) setAudioUrl(result.audioUrl)
-      }
+      // Still processing media or video
+      setVideoStatus('processing')
 
       // Stop polling after 5 minutes (100 polls x 3s = 300s)
       pollCountRef.current += 1
@@ -137,8 +158,8 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
             if (!landing.videoUrl && landing.id) {
               pollCountRef.current = 0
               setVideoStatus('processing')
-              // First check after 8s (video usually takes 30-40s)
-              setTimeout(() => checkVideoStatus(landing.id), 8000)
+              // First check after 5s (media generates in background)
+              setTimeout(() => checkVideoStatus(landing.id), 5000)
               // Then poll every 3 seconds
               pollRef.current = setInterval(() => checkVideoStatus(landing.id), 3000)
             } else if (landing.videoUrl) {
