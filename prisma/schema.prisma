@@ -1,0 +1,99 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  name        String
+  description String
+  price       Float
+  image1      String?
+  image2      String?
+  isCombo     Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  dropiId     String?  @unique
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  landings    LandingPage[]
+}
+
+model Combo {
+  id            String   @id @default(cuid())
+  name          String
+  description   String
+  items         String
+  originalPrice Float
+  price         Float
+  image1        String?
+  image2        String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Config {
+  key   String @id
+  value String
+}
+
+model LandingPage {
+  id          String   @id @default(cuid())
+  slug        String   @unique
+  productId   String?
+  productName String
+  headline    String
+  subheadline String
+  problem     String
+  solution    String
+  benefits    String
+  testimonials String
+  faq         String
+  ctaText     String
+  ctaLink     String
+  heroImage1  String?
+  heroImage2  String?
+  videoUrl    String?
+  audioUrl    String?
+  urgencyText String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  product     Product? @relation(fields: [productId], references: [id])
+}
+
+model Order {
+  id                String   @id @default(cuid())
+  itemType          String
+  itemId            String
+  itemName          String
+  itemPrice         Float
+  quantity          Int
+  subtotal          Float
+  buyerName         String
+  buyerEmail        String
+  buyerPhone        String?
+  buyerDni          String?
+  shippingMethod    String?
+  shippingCost      Float    @default(0)
+  shippingAddress   String?
+  shippingProvince  String?
+  shippingCity      String?
+  shippingStreet    String?
+  shippingNumber    String?
+  shippingFloor     String?
+  shippingCp        String?
+  total             Float
+  paymentStatus     String   @default("pending")
+  paymentRef        String?
+  shippingStatus    String   @default("pending")
+  notes             String?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}

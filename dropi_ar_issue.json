@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://community.vercel.com/t/fix-401-basic-auth-error-on-vercel-preview-custom-domains/31057",
+    "name": "Fix 401 Basic Auth Error on Vercel Preview Custom Domains - Help",
+    "snippet": "I have a preview deployment that should be public on [REDACTED_CUSTOM_DOMAIN], but the domain always returns HTTP 401 with WWW-Authenticate: ...",
+    "host_name": "community.vercel.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.reddit.com/r/vercel/comments/1sjdzfa/401_when_trying_to_use_app_store_connect_api_in",
+    "name": "401 when trying to use App Store Connect api in my vercel env",
+    "snippet": "I'm trying to use vercel to hold verification keys for Apple Store but I just keep getting 401. Not sure what I'm doing wrong all the Keys seem ... Missing: Dropi Argentina token",
+    "host_name": "www.reddit.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://stackoverflow.com/questions/79242549/401-eror-when-trying-to-consume-express-vercel-endpoint",
+    "name": "401 eror when trying to consume express vercel endpoint",
+    "snippet": "I'm experiencing a 401 error when I try to connect to my deployed production Vercel Express endpoint. I have generated a token on the Vercel dashboard and set ... Missing: Argentina | Show results with: Argentina",
+    "host_name": "stackoverflow.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://community.openai.com/t/invalid-api-key-401-error-in-vscode-but-it-shows-the-correct-api-key/1107051",
+    "name": "Invalid API Key 401 Error in VSCode, but it shows the correct API Key?",
+    "snippet": "You're encountering a 401 error when trying to use your API key in VSCode, even though the key appears to be correct because of a wrong authentication. I'm getting the below error \"AuthenticationError: 401 Incorrect API ... AuthenticationError: Error code: 401 - OpenAI Developer Community More results from community.openai.com Missing: Dropi Argentina",
+    "host_name": "community.openai.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://github.com/Polymarket/py-clob-client/issues/270",
+    "name": "HTTP 401: Unauthorized/Invalid api key · Issue #270 - GitHub",
+    "snippet": "I've tried downgrading py_clob_client version to 0.28.0 but the error remains. Does anyone know the possible solution? Many thanks!",
+    "host_name": "github.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://dev.to/geoapify-maps-api/how-to-fix-401-unauthorized-error-when-calling-the-api-4kld",
+    "name": "How to Fix 401 Unauthorized Error When Calling the API",
+    "snippet": "The 401 Unauthorized status code tells you that the request could not be completed because the server did not receive valid authentication ... Missing: Dropi Argentina",
+    "host_name": "dev.to",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.reddit.com/r/Notion/comments/ngx4vf/is_anybody_constantly_facing_the_error",
+    "name": "error\",\"status\":401,\"code\":\"unauthorized\",\"message\":\"API token is",
+    "snippet": "My guess is that you're using the wrong formatting for the secret token, but I'd need to see the code to check. Missing: Dropi Argentina",
+    "host_name": "www.reddit.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://community.labelstud.io/t/persistent-label-studio-api-connection-issue-from-python-401-invalid-token-error/599",
+    "name": "Persistent Label Studio API Connection Issue from Python - 401",
+    "snippet": "I'm repeatedly getting a 401 Client Error: Unauthorized with the detail “Invalid token,” despite having tried all known troubleshooting steps. Missing: Dropi Argentina",
+    "host_name": "community.labelstud.io",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://stackoverflow.com/questions/75827468/why-am-i-getting-a-401-error-even-though-i-am-getting-a-response-when-linking-my",
+    "name": "openai api - Why am I getting a 401 error even  - Stack Overflow",
+    "snippet": "My api key is in a .env.local file in the root folder of my site. The 401 error in the browser states: Unhandled Runtime Error Error ...",
+    "host_name": "stackoverflow.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://help.explaineverything.com/hc/en-us/articles/360012979259-I-m-getting-the-Your-token-is-invalid-401-error",
+    "name": "I'm getting the \"Your token is invalid [401]\" error",
+    "snippet": "This error means that the app has experienced an authentication problem and can't verify your account information.",
+    "host_name": "help.explaineverything.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

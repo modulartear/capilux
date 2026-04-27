@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://docs.mendix.com/apidocs-mxsdk/apidocs",
+    "name": "API Documentation",
+    "snippet": "2 May 2025 — Presents an overview of the Mendix Platform API documentation , for Studio Pro, Frontend, Apps, Deployment, Governance, Marketplace, Catalog, ...",
+    "host_name": "docs.mendix.com",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://docs.bmc.com/xwiki/bin/view/Service-Management/Innovation-Suite/AR-System/ars221/Developing-an-API-program/Integrating-AR-System-forms-with-a-third-party-application-by-using-the-REST-API/Learning-about-the-REST-API/Using-the-REST-API-with-Swagger",
+    "name": "Using the REST API with Swagger - BMC Documentation",
+    "snippet": "27 Apr 2025 — This topic provides guidelines for using Swagger UI. In addition to the Swagger UI, you can view the endpoints provided by this REST API in Endpoints -in-AR- ...",
+    "host_name": "docs.bmc.com",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://developer.gocardless.com/api-reference",
+    "name": "API Reference",
+    "snippet": "Get started building your integration with the GoCardless API in PHP, Ruby or Python, following our step- by - step guide with code samples.",
+    "host_name": "developer.gocardless.com",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://developer.mozilla.org/en-US/docs/Web/API",
+    "name": "Web APIs - MDN Web Docs - Mozilla",
+    "snippet": "29 Jul 2025 — Below is a list of all the APIs and interfaces (object types) that you may be able to use while developing your Web app or site.",
+    "host_name": "developer.mozilla.org",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://docs.viator.com/partner-api/technical",
+    "name": "Viator Partner API",
+    "snippet": "The Viator Partner API v2 comprises a set of endpoints that can support the operation of a fully-featured tours and experiences booking website or application.",
+    "host_name": "docs.viator.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://docs.amp.cisco.com/en/SecureEndpoint/Secure%20Endpoint%20User%20Guide.pdf",
+    "name": "Secure Endpoint User Guide",
+    "snippet": "Once you have saved a custom filter you can select it from the drop down, edit the selected filter, or reset the view to the default with no filters applied. 488 pages",
+    "host_name": "docs.amp.cisco.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://ngrok.com",
+    "name": "ngrok: AI & API Gateway | Secure Tunnels & Traffic",
+    "snippet": "ngrok is an AI and API gateway that securely routes, transforms, and observes traffic to services running anywhere—powering APIs, AI agents, ...",
+    "host_name": "ngrok.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://docs.oracle.com/en-us/iaas/autonomous-database-serverless/doc/select-ai-examples.html",
+    "name": "Examples of Using Select AI",
+    "snippet": "5 days ago — Explore integrating Oracle's Select AI with various supported AI providers to generate, run, and explain SQL from natural language prompts or chat with the LLM.",
+    "host_name": "docs.oracle.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.elastic.co/docs/reference/elasticsearch/mapping-reference/mapping-source-field",
+    "name": "_source field | Elasticsearch Reference",
+    "snippet": "The _source field contains the original JSON document body that was passed at index time. The _source field itself is not indexed (and thus is not searchable).",
+    "host_name": "www.elastic.co",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.manageengine.com/products/service-desk/on-premises/readme-new.html",
+    "name": "ServiceDesk Plus On-Premises release notes: ReadMe &",
+    "snippet": "To view role differences, go to Admin > Integrations > UEM Products . Select click here beside For technician role difference between Servicedesk Plus and UEM ...",
+    "host_name": "www.manageengine.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]

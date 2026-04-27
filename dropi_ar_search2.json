@@ -1,0 +1,92 @@
+[
+  {
+    "url": "https://dropi.ar",
+    "name": "Dropi: Soluciones en Logística y E-commerce en Argentina",
+    "snippet": "Crea tu tienda y conéctala a Dropi . Conecta tu tienda a nuestra plataforma y accede inmediatamente a más de 160,000 productos de proveedores verificados.",
+    "host_name": "dropi.ar",
+    "rank": 0,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://dropi.ar/integraciones",
+    "name": "Integraciones - Dropi: Soluciones en Logística y E-commerce",
+    "snippet": "Debe haberse creado previamente la tienda en Dropi , la cual proporcionará un código conocido como Token . Este Token se pega en Dropify – Configuraciones de ...",
+    "host_name": "dropi.ar",
+    "rank": 1,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://dev.dropi.co",
+    "name": "Dropi",
+    "snippet": "Entorno: dev. Servidor API : https://dev- api . dropi .co/ api . Versión: 3.4.0. Versión de Angular: 18.2.14.",
+    "host_name": "dev.dropi.co",
+    "rank": 2,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://es.scribd.com/document/804372978/Integrations-Core-Dropi-2",
+    "name": "Documentación API de Integraciones Dropi | PDF",
+    "snippet": "**Este token es permanente, no tiene vencimiento, por lo que deberá se almacenado en su. plataforma para consumir los servicios de Integrations. PRODUCTOS",
+    "host_name": "es.scribd.com",
+    "rank": 3,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=bjvjyXsuk-U",
+    "name": "Integración de Dropi y Whatsapp API",
+    "snippet": "En este video hacemos un ejercicio practico junto a Dropi para que conozcas cómo hacer la integración de la plataforma con Whatsapp API .",
+    "host_name": "www.youtube.com",
+    "rank": 4,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.youtube.com/watch?v=JD13vVPA2qA",
+    "name": "Cómo hacer la integración de Dropi y Shopify | Dropshipping",
+    "snippet": "En este video verás cómo es simple hacer la integración de Dropi con tu tienda de Tiendanube. ... Cómo hacer la integración de Dropi y Shopify | ...",
+    "host_name": "www.youtube.com",
+    "rank": 5,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://es.scribd.com/document/683043719/Documentacion-de-Dropi-docx-7",
+    "name": "Documentación API de Dropi | PDF | Contraseña | Json",
+    "snippet": "El documento proporciona información sobre la integración con la plataforma Dropi , incluyendo una lista de servicios que se pueden integrar como login de ...",
+    "host_name": "es.scribd.com",
+    "rank": 6,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://www.odoo.com/documentation/19.0/applications/finance/fiscal_localizations/argentina.html",
+    "name": "Argentina — Odoo 19.0 documentation",
+    "snippet": "There are six Identification Types available by default, as well as 32 inactive types. A list of AR Localization document types in Odoo, as defined by AFIP.",
+    "host_name": "www.odoo.com",
+    "rank": 7,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://docs.oracle.com/en/cloud/paas/autonomous-database/dedicated/hsarg/index.html",
+    "name": "Generate SQL from Natural Language Prompts Using Select AI",
+    "snippet": "The Select AI feature allows Autonomous AI Database to use generative AI with Large Language Models (LLMs) to convert user's input text into Oracle SQL.",
+    "host_name": "docs.oracle.com",
+    "rank": 8,
+    "date": "",
+    "favicon": ""
+  },
+  {
+    "url": "https://cff.dwbooster.com/documentation",
+    "name": "CFF - Documentation - Calculated Fields Form",
+    "snippet": "CÓDIGO COMERCIO: The API Username provided by RedSys or your bank. CLAVE SECRETA: The API Password provided by RedSys or your bank. Mode: Select \"Sandbox ...",
+    "host_name": "cff.dwbooster.com",
+    "rank": 9,
+    "date": "",
+    "favicon": ""
+  }
+]
