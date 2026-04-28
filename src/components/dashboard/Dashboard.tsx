@@ -386,15 +386,30 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
   const handleGenerateLanding = async (productId: string) => {
     setGeneratingLanding(productId)
     setShowLandingOverlay(true)
-    setLandingStep('Generando contenido con IA...')
+    setLandingStep('Creando landing...')
     try {
+      // Step 1: Create landing instantly
       const res = await fetch('/api/landings/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productId }),
       })
-      if (res.ok) {
+      if (!res.ok) {
         const data = await res.json()
+        setLandingStep(`Error: ${data.error || 'No se pudo generar'}`)
+        setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null) }, 3000)
+        return
+      }
+      const data = await res.json()
+      const landingId = data.landing.id
+
+      // Step 2: Start media processing (images, audio, video) — fire and forget
+      setLandingStep('Generando imagenes, audio y video con IA...')
+      fetch('/api/landings/process-media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ landingId }),
+      }).then(() => {
         setLandingStep('Landing creada exitosamente!')
         fetchLandings()
         setTimeout(() => {
@@ -402,11 +417,16 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
           setGeneratingLanding(null)
           setActiveTab('landings')
         }, 1500)
-      } else {
-        const data = await res.json()
-        setLandingStep(`Error: ${data.error || 'No se pudo generar'}`)
-        setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null) }, 3000)
-      }
+      }).catch(() => {
+        // Media processing failed but landing was created
+        setLandingStep('Landing creada (media se procesara en segundo plano)')
+        fetchLandings()
+        setTimeout(() => {
+          setShowLandingOverlay(false)
+          setGeneratingLanding(null)
+          setActiveTab('landings')
+        }, 2000)
+      })
     } catch {
       setLandingStep('Error de conexion')
       setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null) }, 3000)

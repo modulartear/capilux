@@ -93,23 +93,23 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
         } : prev)
       }
 
-      // Update AI-generated copy when ready
-      if (result.landing) {
+      // Update AI-generated copy when ready (returned as flat fields)
+      if (result.headline && result.benefits) {
         setData(prev => prev ? {
           ...prev,
-          headline: result.landing.headline,
-          subheadline: result.landing.subheadline,
-          problem: result.landing.problem,
-          solution: result.landing.solution,
-          benefits: result.landing.benefits,
-          testimonials: result.landing.testimonials,
-          faq: result.landing.faq,
-          ctaText: result.landing.ctaText,
-          urgencyText: result.landing.urgencyText,
+          headline: result.headline,
+          subheadline: result.subheadline,
+          problem: result.problem,
+          solution: result.solution,
+          benefits: result.benefits,
+          testimonials: result.testimonials,
+          faq: result.faq,
+          ctaText: result.ctaText,
+          urgencyText: result.urgencyText,
         } : prev)
-        try { setBenefits(JSON.parse(result.landing.benefits)) } catch {}
-        try { setTestimonials(JSON.parse(result.landing.testimonials)) } catch {}
-        try { setFaq(JSON.parse(result.landing.faq)) } catch {}
+        try { setBenefits(JSON.parse(result.benefits)) } catch {}
+        try { setTestimonials(JSON.parse(result.testimonials)) } catch {}
+        try { setFaq(JSON.parse(result.faq)) } catch {}
       }
 
       if (result.status === 'done' && result.videoUrl) {
