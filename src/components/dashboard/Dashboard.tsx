@@ -404,7 +404,8 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
       const data = await res.json()
       const landingId = data.landing.id
 
-      // Step 2: Start video generation (fast, returns task ID)
+      // Step 2: Generate before/after images (synchronous, ~15-30s)
+      setLandingStep('Generando fotos antes/despues...')
       const mediaRes = await fetch('/api/landings/process-media', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -413,55 +414,15 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
 
       if (mediaRes.ok) {
         const mediaData = await mediaRes.json()
-        if (mediaData.videoUrl) {
-          // Video already existed
-          setLandingStep('Landing creada con video!')
+        if (mediaData.images) {
+          setLandingStep('Landing creada con fotos!')
           fetchLandings()
           setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null); setActiveTab('landings') }, 1500)
           return
         }
-
-        if (mediaData.videoTaskId) {
-          // Poll for video completion with live timer
-          let seconds = 0
-          const timer = setInterval(() => {
-            seconds++
-            setLandingStep(`Generando video UGC... ${seconds}s`)
-          }, 1000)
-
-          const pollVideo = async () => {
-            for (let i = 0; i < 40; i++) {
-              await new Promise(r => setTimeout(r, 3000))
-              try {
-                const statusRes = await fetch(`/api/video/status?landingId=${landingId}`)
-                const statusData = await statusRes.json()
-                if (statusData.status === 'done' && statusData.videoUrl) {
-                  clearInterval(timer)
-                  setLandingStep('Landing creada con video!')
-                  fetchLandings()
-                  setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null); setActiveTab('landings') }, 1500)
-                  return
-                }
-                if (statusData.status === 'video_failed') {
-                  clearInterval(timer)
-                  setLandingStep('Landing creada (el video fallo, podes reintentar)')
-                  fetchLandings()
-                  setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null); setActiveTab('landings') }, 2000)
-                  return
-                }
-              } catch { /* keep polling */ }
-            }
-            clearInterval(timer)
-            setLandingStep('Landing creada (timeout de video)')
-            fetchLandings()
-            setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null); setActiveTab('landings') }, 2000)
-          }
-          pollVideo()
-          return
-        }
       }
 
-      // Fallback: show landing without video
+      // Fallback: show landing without images
       setLandingStep('Landing creada')
       fetchLandings()
       setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null); setActiveTab('landings') }, 1500)
@@ -1670,25 +1631,27 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
             <h3 className="text-xl font-bold text-gray-800 mb-2">Creando Landing Page</h3>
             <p className="text-gray-500 text-sm mb-4">La IA esta generando tu pagina de venta...</p>
             <div className="space-y-2 text-left">
-              <div className={`flex items-center gap-2 text-sm ${landingStep.includes('Creando landing') || landingStep.includes('video') || landingStep.includes('creada') ? 'text-violet-600' : 'text-gray-400'}`}>
-                {(landingStep.includes('Creando landing') || landingStep.includes('video') || landingStep.includes('creada')) && !landingStep.includes('con video') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+              <div className={`flex items-center gap-2 text-sm ${landingStep.includes('Creando landing') || landingStep.includes('fotos') || landingStep.includes('creada') ? 'text-violet-600' : 'text-gray-400'}`}>
+                {(landingStep.includes('Creando landing') || landingStep.includes('fotos')) && !landingStep.includes('con fotos') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                 Creando landing en base de datos
               </div>
-              <div className={`flex items-center gap-2 text-sm ${landingStep.includes('video UGC') ? 'text-violet-600 font-semibold' : landingStep.includes('con video') ? 'text-emerald-600 font-semibold' : 'text-gray-400'}`}>
-                {landingStep.includes('video UGC') ? <Loader2 className="w-4 h-4 animate-spin" /> : landingStep.includes('con video') ? <Check className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4" />}
-                {landingStep.includes('video UGC') ? <span>Generando video UGC (MiniMax)... <span className="text-violet-700 font-mono text-xs">{landingStep.match(/\d+s/)?.[0] || ''}</span></span> : 'Generando video UGC'}
+              <div className={`flex items-center gap-2 text-sm ${landingStep.includes('fotos') ? 'text-violet-600 font-semibold' : landingStep.includes('con fotos') ? 'text-emerald-600 font-semibold' : 'text-gray-400'}`}>
+                {landingStep.includes('fotos antes') ? <Loader2 className="w-4 h-4 animate-spin" /> : landingStep.includes('con fotos') ? <Check className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4" />}
+                {landingStep.includes('fotos antes') ? 'Generando fotos antes/despues con IA...' : 'Generando fotos antes/despues con IA'}
               </div>
-              <div className={`flex items-center gap-2 text-sm ${landingStep.includes('con video') || landingStep.includes('exitosamente') ? 'text-emerald-600 font-semibold' : 'text-gray-400'}`}>
-                {landingStep.includes('con video') ? <Check className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4" />}
+              <div className={`flex items-center gap-2 text-sm ${landingStep.includes('con fotos') || landingStep.includes('creada') ? 'text-emerald-600 font-semibold' : 'text-gray-400'}`}>
+                {landingStep.includes('con fotos') ? <Check className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4" />}
                 Publicando landing page
               </div>
             </div>
-            {/* Show real-time status text for error/timeout states */}
-            {landingStep.includes('fallo') || landingStep.includes('timeout') || landingStep.includes('Error') ? (
-              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-                <p className="text-amber-700 text-sm font-medium">{landingStep}</p>
+            {landingStep.includes('fotos antes') && (
+              <p className="mt-4 text-xs text-gray-400">Las imagenes se generan en ~15-30 segundos</p>
+            )}
+            {landingStep.includes('Error') && (
+              <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-red-700 text-sm font-medium">{landingStep}</p>
               </div>
-            ) : null}
+            )}
           </motion.div>
         </div>
       )}

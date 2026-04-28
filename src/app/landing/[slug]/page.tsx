@@ -16,7 +16,8 @@ import {
   Clock,
   ArrowRight,
   Loader2,
-  Volume2,
+  ImageIcon,
+  Camera,
 } from 'lucide-react'
 
 interface Testimonial {
@@ -52,6 +53,7 @@ interface LandingData {
   heroImage2: string | null
   videoUrl: string | null
   audioUrl: string | null
+  beforeAfterImages: string | null
   urgencyText: string
   product?: {
     price: number
@@ -69,89 +71,19 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
   const [benefits, setBenefits] = useState<Benefit[]>([])
   const [testimonials, setTestimonials] = useState<Testimonial[]>([])
   const [faq, setFaq] = useState<FAQItem[]>([])
-  const [videoStatus, setVideoStatus] = useState<'idle' | 'processing' | 'done' | 'failed'>('idle')
-  const [audioUrl, setAudioUrl] = useState<string | null>(null)
-  const [generatingVideo, setGeneratingVideo] = useState(false)
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const pollCountRef = useRef(0)
+  const [images, setImages] = useState<{ url: string; label: string }[]>([])
+  const [imageStatus, setImageStatus] = useState<'idle' | 'generating' | 'done'>('idle')
+  const [generatingImages, setGeneratingImages] = useState(false)
   const dataRef = useRef<LandingData | null>(null)
-  const audioRef = useRef<HTMLAudioElement | null>(null)
-  const checkVideoStatusRef = useRef<(landingId: string) => Promise<void>>()
 
   // Keep dataRef in sync
   useEffect(() => { dataRef.current = data }, [data])
 
-  // Check video status via API — also picks up new images, audio, and AI copy
-  const checkVideoStatus = useCallback(async (landingId: string) => {
-    try {
-      const res = await fetch(`/api/video/status?landingId=${landingId}`)
-      const result = await res.json()
-
-      // Update audio URL when available
-      if (result.audioUrl) setAudioUrl(result.audioUrl)
-
-      // Update images when they become available
-      if (result.heroImage1 || result.heroImage2) {
-        setData(prev => prev ? {
-          ...prev,
-          ...(result.heroImage1 ? { heroImage1: result.heroImage1 } : {}),
-          ...(result.heroImage2 ? { heroImage2: result.heroImage2 } : {}),
-        } : prev)
-      }
-
-      // Update AI-generated copy when ready (returned as flat fields)
-      if (result.headline && result.benefits) {
-        setData(prev => prev ? {
-          ...prev,
-          headline: result.headline,
-          subheadline: result.subheadline,
-          problem: result.problem,
-          solution: result.solution,
-          benefits: result.benefits,
-          testimonials: result.testimonials,
-          faq: result.faq,
-          ctaText: result.ctaText,
-          urgencyText: result.urgencyText,
-        } : prev)
-        try { setBenefits(JSON.parse(result.benefits)) } catch {}
-        try { setTestimonials(JSON.parse(result.testimonials)) } catch {}
-        try { setFaq(JSON.parse(result.faq)) } catch {}
-      }
-
-      if (result.status === 'done' && result.videoUrl) {
-        setData(prev => prev ? { ...prev, videoUrl: result.videoUrl } : prev)
-        setVideoStatus('done')
-        if (pollRef.current) clearInterval(pollRef.current)
-        return
-      }
-
-      if (result.status === 'failed' || result.status === 'video_failed' || result.status === 'no_task') {
-        setVideoStatus('idle')
-        if (pollRef.current) clearInterval(pollRef.current)
-        return
-      }
-
-      // Still processing media or video
-      setVideoStatus('processing')
-
-      // Stop polling after 5 minutes (100 polls x 3s = 300s)
-      pollCountRef.current += 1
-      if (pollCountRef.current >= 100) {
-        if (pollRef.current) clearInterval(pollRef.current)
-        setVideoStatus('failed')
-      }
-    } catch {
-      // Silently ignore poll errors
-    }
-  }, [])
-
-  // Keep checkVideoStatus ref in sync
-  useEffect(() => { checkVideoStatusRef.current = checkVideoStatus }, [checkVideoStatus])
-
-  const handleGenerateVideo = useCallback(async () => {
-    if (!dataRef.current?.id || generatingVideo) return
-    setGeneratingVideo(true)
-    setVideoStatus('processing')
+  // Generate before/after images
+  const handleGenerateImages = useCallback(async () => {
+    if (!dataRef.current?.id || generatingImages) return
+    setGeneratingImages(true)
+    setImageStatus('generating')
     try {
       const res = await fetch('/api/landings/process-media', {
         method: 'POST',
@@ -159,26 +91,20 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
         body: JSON.stringify({ landingId: dataRef.current!.id }),
       })
       const mediaData = await res.json()
-      if (mediaData.videoUrl) {
-        setData(prev => prev ? { ...prev, videoUrl: mediaData.videoUrl } : prev)
-        setVideoStatus('done')
-        setGeneratingVideo(false)
-        return
-      }
-      if (mediaData.videoTaskId) {
-        pollCountRef.current = 0
-        const landingId = dataRef.current!.id
-        setTimeout(() => checkVideoStatusRef.current?.(landingId), 5000)
-        pollRef.current = setInterval(() => checkVideoStatusRef.current?.(landingId), 3000)
+      if (mediaData.images) {
+        try { setImages(JSON.parse(mediaData.images)) } catch { setImages([]) }
+        setImageStatus('done')
+      } else {
+        setImageStatus('idle')
       }
     } catch (err) {
-      console.error('Failed to start video generation:', err)
-      setVideoStatus('idle')
+      console.error('Failed to generate images:', err)
+      setImageStatus('idle')
     }
-    setGeneratingVideo(false)
-  }, [generatingVideo])
+    setGeneratingImages(false)
+  }, [generatingImages])
 
-  // Start video polling when landing loads without video
+  // On load, check if images already exist
   useEffect(() => {
     params.then(({ slug }) => {
       fetch(`/api/landings/${slug}`)
@@ -191,30 +117,13 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
             try { setBenefits(JSON.parse(landing.benefits)) } catch { setBenefits([]) }
             try { setTestimonials(JSON.parse(landing.testimonials)) } catch { setTestimonials([]) }
             try { setFaq(JSON.parse(landing.faq)) } catch { setFaq([]) }
-            if (landing.audioUrl) setAudioUrl(landing.audioUrl)
 
-            if (!landing.videoUrl && landing.id) {
-              // Check status first — only poll if there's an active task
-              pollCountRef.current = 0
-              fetch(`/api/video/status?landingId=${landing.id}`)
-                .then(res => res.json())
-                .then(result => {
-                  if (result.status === 'no_task' || result.status === 'video_failed') {
-                    // No active task — show idle with generate button
-                    setVideoStatus('idle')
-                  } else if (result.status === 'done' && result.videoUrl) {
-                    setData(prev => prev ? { ...prev, videoUrl: result.videoUrl } : prev)
-                    setVideoStatus('done')
-                  } else {
-                    // Active task — start polling
-                    setVideoStatus('processing')
-                    setTimeout(() => checkVideoStatusRef.current?.(landing.id), 5000)
-                    pollRef.current = setInterval(() => checkVideoStatusRef.current?.(landing.id), 3000)
-                  }
-                })
-                .catch(() => setVideoStatus('idle'))
-            } else if (landing.videoUrl) {
-              setVideoStatus('done')
+            // Parse before/after images if they exist
+            if (landing.beforeAfterImages) {
+              try {
+                setImages(JSON.parse(landing.beforeAfterImages))
+                setImageStatus('done')
+              } catch { setImages([]) }
             }
           }
         })
@@ -222,10 +131,8 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
         .finally(() => setLoading(false))
     })
 
-    return () => {
-      if (pollRef.current) clearInterval(pollRef.current)
-    }
-  }, [params, checkVideoStatus])
+    return undefined
+  }, [params])
 
   if (loading) {
     return (
@@ -327,88 +234,71 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
         </div>
       </section>
 
-      {/* SECTION 2: UGC VIDEO + AUDIO */}
+      {/* SECTION 2: BEFORE / AFTER PHOTO BOOK */}
       <section className="py-12 sm:py-16 bg-gray-50">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-            <p className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">Testimonio Real</p>
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-8">Escucha y mira lo que dicen nuestros clientes</h2>
+            <p className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">Resultados Reales</p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Antes y Despues</h2>
+            <p className="text-gray-500 mb-8 max-w-lg mx-auto">Mirá los resultados reales de nuestros clientes que ya probaron {data.productName}</p>
 
-            {/* Audio player */}
-            {audioUrl && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mb-6 bg-white rounded-2xl p-4 shadow-md border border-emerald-100"
-              >
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={() => {
-                      if (audioRef.current) {
-                        if (audioRef.current.paused) {
-                          audioRef.current.play()
-                        } else {
-                          audioRef.current.pause()
-                        }
-                      }
-                    }}
-                    className="w-12 h-12 bg-emerald-600 hover:bg-emerald-700 rounded-full flex items-center justify-center shadow-lg flex-shrink-0 transition-colors"
+            {imageStatus === 'done' && images.length > 0 ? (
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+                {images.map((img, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: i * 0.15 }}
+                    className="relative group"
                   >
-                    <svg className="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M8 5v14l11-7z" />
-                    </svg>
-                  </button>
-                  <div className="flex-1 text-left">
-                    <p className="text-sm font-semibold text-gray-800">Audio testimonial - Voz real</p>
-                    <p className="text-xs text-gray-500">Escucha la experiencia de nuestra clienta</p>
-                  </div>
-                  <Volume2 className="w-5 h-5 text-emerald-500" />
-                </div>
-                <audio ref={audioRef} src={audioUrl} preload="auto" className="w-full mt-3" controls />
-              </motion.div>
-            )}
-
-            <div className="relative aspect-video bg-gray-900 rounded-2xl overflow-hidden shadow-xl">
-              {data.videoUrl ? (
-                <video
-                  src={data.videoUrl}
-                  controls
-                  muted
-                  loop
-                  playsInline
-                  className="w-full h-full object-cover rounded-2xl"
-                />
-              ) : videoStatus === 'processing' ? (
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/80 to-teal-900/80" />
-                  <div className="relative z-10 text-center">
-                    <Loader2 className="w-12 h-12 text-emerald-400 animate-spin mx-auto mb-4" />
-                    <p className="text-white font-semibold text-lg">Generando video UGC...</p>
-                    <p className="text-white/60 text-sm mt-1">La IA esta creando tu video con el producto</p>
-                    {audioUrl && <p className="text-emerald-300 text-xs mt-3">Mientras tanto, escucha el audio testimonial abajo</p>}
-                    {!audioUrl && <p className="text-emerald-300 text-xs mt-3">El video aparecera automaticamente cuando este listo</p>}
-                  </div>
-                </div>
-              ) : (
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="absolute inset-0 bg-gradient-to-br from-emerald-900/80 to-teal-900/80" />
-                  <div className="relative z-10 text-center">
-                    <div className="w-16 h-16 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center mx-auto mb-4">
-                      <svg className="w-7 h-7 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
+                    <div className="relative overflow-hidden rounded-2xl shadow-lg border-2 border-white aspect-square">
+                      <img
+                        src={img.url}
+                        alt={img.label}
+                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                      <div className="absolute bottom-0 left-0 right-0 p-4">
+                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${i === 0 ? 'bg-red-500 text-white' : i === 1 ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                          {img.label}
+                        </span>
+                      </div>
                     </div>
-                    <p className="text-white font-semibold text-lg">Video UGC</p>
-                    <p className="text-white/60 text-sm mt-1 mb-4">Aun no se genero el video para esta landing</p>
-                    <button
-                      onClick={handleGenerateVideo}
-                      disabled={generatingVideo}
-                      className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-700 text-white font-semibold rounded-xl transition-all text-sm shadow-lg hover:shadow-emerald-500/30"
-                    >
-                      {generatingVideo ? 'Generando...' : 'Generar Video UGC'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+                    {i === 0 && (
+                      <div className="absolute -top-3 -right-3 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center shadow-lg">
+                        <Camera className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                    {i === images.length - 1 && (
+                      <div className="absolute -top-3 -right-3 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg">
+                        <CheckCircle2 className="w-4 h-4 text-white" />
+                      </div>
+                    )}
+                  </motion.div>
+                ))}
+              </div>
+            ) : imageStatus === 'generating' ? (
+              <div className="bg-white rounded-2xl p-12 shadow-lg border border-gray-100">
+                <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mx-auto mb-4" />
+                <p className="text-gray-800 font-semibold text-lg">Generando fotos con IA...</p>
+                <p className="text-gray-400 text-sm mt-2">Creando las imagenes de antes y despues. Esto tarda unos segundos.</p>
+              </div>
+            ) : (
+              <div className="bg-white rounded-2xl p-12 shadow-lg border border-gray-100">
+                <ImageIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
+                <p className="text-gray-800 font-semibold text-lg mb-2">Fotos Antes y Despues</p>
+                <p className="text-gray-400 text-sm mb-6">Aun no se generaron las imagenes de resultados</p>
+                <button
+                  onClick={handleGenerateImages}
+                  disabled={generatingImages}
+                  className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-300 text-white font-semibold rounded-xl transition-all text-sm shadow-lg hover:shadow-emerald-500/30 inline-flex items-center gap-2"
+                >
+                  <Camera className="w-4 h-4" />
+                  {generatingImages ? 'Generando...' : 'Generar Fotos con IA'}
+                </button>
+              </div>
+            )}
           </motion.div>
         </div>
       </section>

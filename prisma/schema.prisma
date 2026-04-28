@@ -62,8 +62,9 @@ model LandingPage {
   productName  String
   solution     String
   testimonials String
-  audioUrl     String?
-  product      Product? @relation(fields: [productId], references: [id])
+  audioUrl         String?
+  beforeAfterImages String?
+  product          Product? @relation(fields: [productId], references: [id])
 }
 
 model Order {
