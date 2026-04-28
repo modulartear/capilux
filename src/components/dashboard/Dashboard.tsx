@@ -388,6 +388,7 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
     setShowLandingOverlay(true)
     setLandingStep('Creando landing...')
     try {
+      // Step 1: Create landing
       const res = await fetch('/api/landings/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -401,36 +402,31 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
       }
       const data = await res.json()
 
-      // Start media processing — wait up to 60s for video task to be created
-      setLandingStep('Generando video e imagenes con IA...')
-      const controller = new AbortController()
-      const timeout = setTimeout(() => controller.abort(), 60000)
-
-      fetch('/api/landings/process-media', {
+      // Step 2: Generate video — this endpoint waits until video is ready and saves it
+      setLandingStep('Generando video UGC con IA... Aguarde un momento.')
+      const mediaRes = await fetch('/api/landings/process-media', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ landingId: data.landing.id }),
-        signal: controller.signal,
-      }).then(() => {
-        clearTimeout(timeout)
-        setLandingStep('Landing creada! Video generandose...')
-        fetchLandings()
-        setTimeout(() => {
-          setShowLandingOverlay(false)
-          setGeneratingLanding(null)
-          setActiveTab('landings')
-        }, 1500)
-      }).catch((e) => {
-        clearTimeout(timeout)
-        // Timeout or error — landing was created, show it anyway
-        setLandingStep('Landing creada! La IA sigue generando el video...')
-        fetchLandings()
-        setTimeout(() => {
-          setShowLandingOverlay(false)
-          setGeneratingLanding(null)
-          setActiveTab('landings')
-        }, 1500)
       })
+
+      if (mediaRes.ok) {
+        const mediaData = await mediaRes.json()
+        if (mediaData.videoUrl) {
+          setLandingStep('Landing creada con video!')
+        } else {
+          setLandingStep('Landing creada')
+        }
+      } else {
+        setLandingStep('Landing creada (el video se generara en segundo plano)')
+      }
+
+      fetchLandings()
+      setTimeout(() => {
+        setShowLandingOverlay(false)
+        setGeneratingLanding(null)
+        setActiveTab('landings')
+      }, 1500)
     } catch {
       setLandingStep('Error de conexion')
       setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null) }, 3000)
