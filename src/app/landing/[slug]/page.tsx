@@ -71,9 +71,15 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
   const [faq, setFaq] = useState<FAQItem[]>([])
   const [videoStatus, setVideoStatus] = useState<'idle' | 'processing' | 'done' | 'failed'>('idle')
   const [audioUrl, setAudioUrl] = useState<string | null>(null)
+  const [generatingVideo, setGeneratingVideo] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const pollCountRef = useRef(0)
+  const dataRef = useRef<LandingData | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const checkVideoStatusRef = useRef<(landingId: string) => Promise<void>>()
+
+  // Keep dataRef in sync
+  useEffect(() => { dataRef.current = data }, [data])
 
   // Check video status via API — also picks up new images, audio, and AI copy
   const checkVideoStatus = useCallback(async (landingId: string) => {
@@ -138,6 +144,39 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
       // Silently ignore poll errors
     }
   }, [])
+
+  // Keep checkVideoStatus ref in sync
+  useEffect(() => { checkVideoStatusRef.current = checkVideoStatus }, [checkVideoStatus])
+
+  const handleGenerateVideo = useCallback(async () => {
+    if (!dataRef.current?.id || generatingVideo) return
+    setGeneratingVideo(true)
+    setVideoStatus('processing')
+    try {
+      const res = await fetch('/api/landings/process-media', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ landingId: dataRef.current!.id }),
+      })
+      const mediaData = await res.json()
+      if (mediaData.videoUrl) {
+        setData(prev => prev ? { ...prev, videoUrl: mediaData.videoUrl } : prev)
+        setVideoStatus('done')
+        setGeneratingVideo(false)
+        return
+      }
+      if (mediaData.videoTaskId) {
+        pollCountRef.current = 0
+        const landingId = dataRef.current!.id
+        setTimeout(() => checkVideoStatusRef.current?.(landingId), 5000)
+        pollRef.current = setInterval(() => checkVideoStatusRef.current?.(landingId), 3000)
+      }
+    } catch (err) {
+      console.error('Failed to start video generation:', err)
+      setVideoStatus('idle')
+    }
+    setGeneratingVideo(false)
+  }, [generatingVideo])
 
   // Start video polling when landing loads without video
   useEffect(() => {
@@ -348,7 +387,14 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
                       <svg className="w-7 h-7 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
                     </div>
                     <p className="text-white font-semibold text-lg">Video UGC</p>
-                    <p className="text-white/60 text-sm mt-1">El video se generara con la proxima creacion de landing</p>
+                    <p className="text-white/60 text-sm mt-1 mb-4">Aun no se genero el video para esta landing</p>
+                    <button
+                      onClick={handleGenerateVideo}
+                      disabled={generatingVideo}
+                      className="px-5 py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:bg-emerald-700 text-white font-semibold rounded-xl transition-all text-sm shadow-lg hover:shadow-emerald-500/30"
+                    >
+                      {generatingVideo ? 'Generando...' : 'Generar Video UGC'}
+                    </button>
                   </div>
                 </div>
               )}
