@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { queryVideoTask } from '@/lib/minimax-video'
 
 export async function GET(request: NextRequest) {
   try {
@@ -43,13 +44,12 @@ export async function GET(request: NextRequest) {
     })
 
     if (!taskConfig) {
-      // No video task yet — media still processing (process-media endpoint still running)
+      // No video task yet
       return NextResponse.json({
         status: 'media_processing',
         audioUrl: landing.audioUrl || null,
         heroImage1: landing.heroImage1 || null,
         heroImage2: landing.heroImage2 || null,
-        // Return latest copy if AI copy has been applied
         headline: landing.headline,
         subheadline: landing.subheadline,
         problem: landing.problem,
@@ -64,47 +64,37 @@ export async function GET(request: NextRequest) {
 
     const taskId = taskConfig.value
 
-    // Poll the video task
-    const ZAI = (await import('z-ai-web-dev-sdk')).default
-    const zai = await ZAI.create()
-    const result = await zai.async.result.query(taskId)
+    // Poll the MiniMax video task
+    const result = await queryVideoTask(taskId)
 
-    if (result.task_status === 'SUCCESS') {
-      const videoUrl =
-        result.video_result?.[0]?.url ||
-        result.video_url ||
-        result.url ||
-        result.video
+    if (result.status === 'done' && result.videoUrl) {
+      await db.landingPage.update({
+        where: { id: landingId },
+        data: { videoUrl: result.videoUrl },
+      })
 
-      if (videoUrl) {
-        await db.landingPage.update({
-          where: { id: landingId },
-          data: { videoUrl },
-        })
+      // Clean up task ID
+      await db.config.delete({ where: { key: `video_task_${landingId}` } }).catch(() => {})
 
-        // Clean up task ID
-        await db.config.delete({ where: { key: `video_task_${landingId}` } }).catch(() => {})
-
-        return NextResponse.json({
-          status: 'done',
-          videoUrl,
-          audioUrl: landing.audioUrl,
-          heroImage1: landing.heroImage1,
-          heroImage2: landing.heroImage2,
-          headline: landing.headline,
-          subheadline: landing.subheadline,
-          problem: landing.problem,
-          solution: landing.solution,
-          benefits: landing.benefits,
-          testimonials: landing.testimonials,
-          faq: landing.faq,
-          ctaText: landing.ctaText,
-          urgencyText: landing.urgencyText,
-        })
-      }
+      return NextResponse.json({
+        status: 'done',
+        videoUrl: result.videoUrl,
+        audioUrl: landing.audioUrl,
+        heroImage1: landing.heroImage1,
+        heroImage2: landing.heroImage2,
+        headline: landing.headline,
+        subheadline: landing.subheadline,
+        problem: landing.problem,
+        solution: landing.solution,
+        benefits: landing.benefits,
+        testimonials: landing.testimonials,
+        faq: landing.faq,
+        ctaText: landing.ctaText,
+        urgencyText: landing.urgencyText,
+      })
     }
 
-    if (result.task_status === 'FAIL') {
+    if (result.status === 'failed') {
       await db.config.delete({ where: { key: `video_task_${landingId}` } }).catch(() => {})
       return NextResponse.json({
         status: 'video_failed',

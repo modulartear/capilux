@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
+import { createVideoTask } from '@/lib/minimax-video'
 
-// Creates video task and returns task ID immediately.
+// Creates a MiniMax/Hailuo video task and returns task ID immediately.
 // Client polls /api/video/status for progress until video is saved to landing.
 export async function POST(request: NextRequest) {
   try {
@@ -26,35 +27,36 @@ export async function POST(request: NextRequest) {
     }
 
     const productName = landing.productName
-    const productDescription = landing.description || ''
+    const productDescription = landing.solution || ''
 
-    const ZAI = (await import('z-ai-web-dev-sdk')).default
-    const zai = await ZAI.create()
-
+    // Read UGC avatar image
     const fs = await import('fs')
     const path = await import('path')
     const avatarPath = path.join(process.cwd(), 'public', 'ugc-avatar.jpg')
-    const imgBuffer = fs.readFileSync(avatarPath)
-    const videoImage = `data:image/jpeg;base64,${imgBuffer.toString('base64')}`
+    let videoImage: string | undefined
+    try {
+      const imgBuffer = fs.readFileSync(avatarPath)
+      videoImage = `data:image/jpeg;base64,${imgBuffer.toString('base64')}`
+    } catch {
+      console.warn('[process-media] ugc-avatar.jpg not found, using text-to-video mode')
+    }
 
-    const prompt = `Video estilo UGC testimonial en español argentino. Una mujer joven argentina mostrando y explicando los beneficios de ${productName}. ${productDescription.split('.')[0]}. Sostiene el producto frente a la camara, lo muestra con orgullo, gira el frasco para ver las etiquetas. Iluminacion natural, estilo selfie, fondo living moderno. Expresion genuina y entusiasmada. Redes sociales style.`
+    const prompt = `Video estilo UGC testimonial en espanol argentino. Una mujer joven argentina mostrando y explicando los beneficios de ${productName}. ${productDescription.split('.')[0]}. Sostiene el producto frente a la camara, lo muestra con orgullo, gira el frasco para ver las etiquetas. Iluminacion natural, estilo selfie, fondo living moderno. Expresion genuina y entusiasmada. Redes sociales style.`
 
-    const task = await zai.video.generations.create({
+    // Use MiniMax/Hailuo API
+    const { taskId } = await createVideoTask({
       prompt,
-      image_url: videoImage,
-      quality: 'speed',
-      duration: 5,
-      size: '1024x576',
+      imageUrl: videoImage,
+      model: 'video-01-live',
     })
-    console.log(`Video task created: ${task.id} for landing ${landingId}`)
 
     await db.config.upsert({
       where: { key: `video_task_${landingId}` },
-      update: { value: task.id },
-      create: { key: `video_task_${landingId}`, value: task.id },
+      update: { value: taskId },
+      create: { key: `video_task_${landingId}`, value: taskId },
     })
 
-    return NextResponse.json({ success: true, videoTaskId: task.id })
+    return NextResponse.json({ success: true, videoTaskId: taskId, provider: 'minimax' })
   } catch (error: any) {
     console.error('Media processing error:', error)
     return NextResponse.json({ error: error.message || 'Error processing media' }, { status: 500 })

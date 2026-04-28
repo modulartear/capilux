@@ -341,6 +341,7 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
   // Config states
   const [mpToken, setMpToken] = useState('')
   const [siteURL, setSiteURL] = useState('')
+  const [minimaxApiKey, setMinimaxApiKey] = useState('')
   const [configLoading, setConfigLoading] = useState(false)
   const [configSaved, setConfigSaved] = useState(false)
 
@@ -484,6 +485,7 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
         const data = await res.json()
         if (data.MP_ACCESS_TOKEN) setMpToken(data.MP_ACCESS_TOKEN)
         if (data.NEXT_PUBLIC_SITE_URL) setSiteURL(data.NEXT_PUBLIC_SITE_URL)
+        if (data.MINIMAX_API_KEY) setMinimaxApiKey(data.MINIMAX_API_KEY)
         if (data.DROPI_TOKEN) {
           setDropiToken(data.DROPI_TOKEN)
           setDropiIntegrationKey(data.DROPI_TOKEN)
@@ -503,7 +505,7 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
       await fetch('/api/config', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ configs: { MP_ACCESS_TOKEN: mpToken, NEXT_PUBLIC_SITE_URL: siteURL } }),
+        body: JSON.stringify({ configs: { MP_ACCESS_TOKEN: mpToken, NEXT_PUBLIC_SITE_URL: siteURL, MINIMAX_API_KEY: minimaxApiKey } }),
       })
       setConfigSaved(true)
     } finally {
@@ -1375,6 +1377,28 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
                 <Button onClick={handleSaveConfig} disabled={configLoading} className="bg-emerald-600 hover:bg-emerald-700 gap-2">
                   {configLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                   Guardar Configuracion
+                </Button>
+                {configSaved && (
+                  <p className="text-emerald-600 text-sm flex items-center gap-1"><Check className="w-4 h-4" /> Configuracion guardada correctamente</p>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <Sparkles className="w-5 h-5 text-purple-500" />
+                  MiniMax / Hailuo AI - Video UGC
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-5">
+                <p className="text-gray-500 text-sm">Ingresa tu API Key de MiniMax para generar videos UGC con IA. Obtenela en <a href="https://platform.minimaxi.com" target="_blank" rel="noreferrer" className="text-emerald-600 underline hover:text-emerald-700">platform.minimaxi.com</a>.</p>
+                <div className="space-y-1.5">
+                  <Label htmlFor="minimaxKey" className="text-sm font-medium">MiniMax API Key</Label>
+                  <Input id="minimaxKey" type="password" value={minimaxApiKey} onChange={(e) => setMinimaxApiKey(e.target.value)} placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." className="h-11" />
+                </div>
+                <Button onClick={handleSaveConfig} disabled={configLoading} className="bg-purple-600 hover:bg-purple-700 gap-2">
+                  {configLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                  Guardar API Key
                 </Button>
                 {configSaved && (
                   <p className="text-emerald-600 text-sm flex items-center gap-1"><Check className="w-4 h-4" /> Configuracion guardada correctamente</p>
