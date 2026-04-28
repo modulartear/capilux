@@ -158,23 +158,8 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
               pollCountRef.current = 0
               setVideoStatus('processing')
 
-              // Trigger process-media if no video task exists yet
-              // (in case dashboard's fire-and-forget didn't complete on serverless)
-              fetch('/api/video/status', {
-                headers: { 'Content-Type': 'application/json' },
-              }).then(() => {
-                return fetch(`/api/video/status?landingId=${landing.id}`)
-              }).then(r => r.json()).then(status => {
-                if (status.status === 'media_processing' && !status.audioUrl) {
-                  // No media yet — trigger process-media from here
-                  fetch('/api/landings/process-media', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ landingId: landing.id }),
-                  }).catch(() => {})
-                }
-              }).catch(() => {})
-
+              // Only poll — do NOT trigger process-media here.
+              // Media generation is handled by the Dashboard after landing creation.
               // First check after 5s
               setTimeout(() => checkVideoStatus(landing.id), 5000)
               // Then poll every 3 seconds

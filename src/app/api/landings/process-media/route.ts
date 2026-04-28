@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
 
-// Everything runs in parallel: video starts immediately, images/TTS/copy alongside.
-// Returns as soon as video task is created.
+// 1) Creates video task immediately (saved to DB)
+// 2) Returns video task ID so client can start polling
+// 3) Images/TTS/copy continue in background and update landing
 export async function POST(request: NextRequest) {
   try {
     const { landingId } = await request.json()
@@ -35,7 +36,7 @@ export async function POST(request: NextRequest) {
     const ZAI = (await import('z-ai-web-dev-sdk')).default
     const zai = await ZAI.create()
 
-    // Prepare video image immediately (use existing product image, don't wait for AI images)
+    // === STEP 1: Create video task FIRST (fast, ~3s) ===
     let videoImage: string | undefined
     if (productImage) {
       if (productImage.startsWith('data:')) {
@@ -66,31 +67,30 @@ export async function POST(request: NextRequest) {
 
     const videoPrompt = `Video estilo UGC testimonial en español argentino. Una mujer joven argentina mostrando y explicando el producto ${productName}. Sostiene el producto frente a la camara, lo muestra de cerca con orgullo, gira el frasco para ver las etiquetas. Iluminacion natural, estilo selfie, fondo living moderno. Expresion genuina y entusiasmada. Redes sociales style.`
 
-    // === EVERYTHING IN PARALLEL: video + images + TTS + AI copy ===
-    const [videoResult, aiImg1, aiImg2, ttsResult, aiCopy] = await Promise.allSettled([
+    const videoPayload: any = {
+      prompt: videoPrompt,
+      quality: 'speed',
+      duration: 5,
+      size: '1024x576',
+    }
+    if (videoImage) videoPayload.image_url = videoImage
 
-      // 1) VIDEO — starts immediately, no waiting
-      (async () => {
-        const videoPayload: any = {
-          prompt: videoPrompt,
-          quality: 'speed',
-          duration: 5,
-          size: '1024x576',
-        }
-        if (videoImage) videoPayload.image_url = videoImage
+    const task = await zai.video.generations.create(videoPayload)
+    console.log(`Video task created: ${task.id} for landing ${landingId}`)
 
-        const task = await zai.video.generations.create(videoPayload)
-        console.log(`Video task created: ${task.id} for landing ${landingId}`)
+    // Save video task ID to DB immediately
+    await db.config.upsert({
+      where: { key: `video_task_${landingId}` },
+      update: { value: task.id },
+      create: { key: `video_task_${landingId}`, value: task.id },
+    })
 
-        await db.config.upsert({
-          where: { key: `video_task_${landingId}` },
-          update: { value: task.id },
-          create: { key: `video_task_${landingId}`, value: task.id },
-        })
-        return task.id
-      })(),
+    // === STEP 2: Return immediately with video task ID ===
+    // Client can now poll /api/video/status while images/TTS/copy generate below
 
-      // 2) Hero image
+    // Fire images + TTS + copy in background (don't await)
+    Promise.allSettled([
+      // Hero image
       (async (): Promise<string | null> => {
         try {
           const result = await zai.images.generations.create({
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
         } catch (e) { console.error('Hero image failed:', e); return null }
       })(),
 
-      // 3) Lifestyle image
+      // Lifestyle image
       (async (): Promise<string | null> => {
         try {
           const result = await zai.images.generations.create({
@@ -112,7 +112,7 @@ export async function POST(request: NextRequest) {
         } catch (e) { console.error('Lifestyle image failed:', e); return null }
       })(),
 
-      // 4) TTS audio
+      // TTS audio
       (async (): Promise<string | null> => {
         try {
           const ttsText = `Hola che! Soy Mati y les quiero contar mi experiencia con ${productName}. Desde que lo empece a usar note un cambio barbaro en mi dia a dia. ${productDescription.split('.')[0]}. Lo uso hace dos meses y te juro que no puedo mas sin el. Lo recomiendo al cien por ciento, no lo duden, es re copado.`.slice(0, 1024)
@@ -128,7 +128,7 @@ export async function POST(request: NextRequest) {
         } catch (e) { console.error('TTS failed:', e); return null }
       })(),
 
-      // 5) AI copy
+      // AI copy
       (async () => {
         try {
           const priceStr = landing.product?.price
@@ -150,38 +150,33 @@ export async function POST(request: NextRequest) {
           return null
         } catch (e) { console.error('AI copy failed:', e); return null }
       })(),
-    ])
-
-    // Update landing with generated images + audio + copy
-    const updateData: any = {}
-    if (aiImg1.status === 'fulfilled' && aiImg1.value) updateData.heroImage1 = aiImg1.value
-    if (aiImg2.status === 'fulfilled' && aiImg2.value) updateData.heroImage2 = aiImg2.value
-    if (ttsResult.status === 'fulfilled' && ttsResult.value) updateData.audioUrl = ttsResult.value
-    if (aiCopy.status === 'fulfilled' && aiCopy.value) {
-      Object.assign(updateData, {
-        headline: aiCopy.value.headline,
-        subheadline: aiCopy.value.subheadline,
-        problem: aiCopy.value.problem,
-        solution: aiCopy.value.solution,
-        benefits: aiCopy.value.benefits,
-        testimonials: aiCopy.value.testimonials,
-        faq: aiCopy.value.faq,
-        ctaText: aiCopy.value.ctaText,
-        urgencyText: aiCopy.value.urgencyText,
-      })
-    }
-    if (Object.keys(updateData).length > 0) {
-      await db.landingPage.update({ where: { id: landingId }, data: updateData })
-    }
-
-    const videoTaskId = videoResult.status === 'fulfilled' ? videoResult.value : null
+    ]).then(async ([aiImg1, aiImg2, ttsResult, aiCopy]) => {
+      const updateData: any = {}
+      if (aiImg1.status === 'fulfilled' && aiImg1.value) updateData.heroImage1 = aiImg1.value
+      if (aiImg2.status === 'fulfilled' && aiImg2.value) updateData.heroImage2 = aiImg2.value
+      if (ttsResult.status === 'fulfilled' && ttsResult.value) updateData.audioUrl = ttsResult.value
+      if (aiCopy.status === 'fulfilled' && aiCopy.value) {
+        Object.assign(updateData, {
+          headline: aiCopy.value.headline,
+          subheadline: aiCopy.value.subheadline,
+          problem: aiCopy.value.problem,
+          solution: aiCopy.value.solution,
+          benefits: aiCopy.value.benefits,
+          testimonials: aiCopy.value.testimonials,
+          faq: aiCopy.value.faq,
+          ctaText: aiCopy.value.ctaText,
+          urgencyText: aiCopy.value.urgencyText,
+        })
+      }
+      if (Object.keys(updateData).length > 0) {
+        await db.landingPage.update({ where: { id: landingId }, data: updateData }).catch(() => {})
+        console.log(`Landing ${landingId} updated with media in background`)
+      }
+    }).catch(() => {})
 
     return NextResponse.json({
-      success: !!videoTaskId,
-      videoTaskId,
-      imagesGenerated: !!(updateData.heroImage1 || updateData.heroImage2),
-      audioGenerated: !!updateData.audioUrl,
-      copyGenerated: !!updateData.headline,
+      success: true,
+      videoTaskId: task.id,
     })
   } catch (error: any) {
     console.error('Media processing error:', error)

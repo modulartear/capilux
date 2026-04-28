@@ -401,22 +401,36 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
       }
       const data = await res.json()
 
-      // Fire process-media in background (don't wait for it)
-      // The server keeps processing even if client moves on
+      // Start media processing — wait up to 60s for video task to be created
+      setLandingStep('Generando video e imagenes con IA...')
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), 60000)
+
       fetch('/api/landings/process-media', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ landingId: data.landing.id }),
-      }).catch(() => {})
-
-      // Show landing immediately — media generates in background
-      setLandingStep('Landing creada! La IA esta generando imagenes y video...')
-      fetchLandings()
-      setTimeout(() => {
-        setShowLandingOverlay(false)
-        setGeneratingLanding(null)
-        setActiveTab('landings')
-      }, 1500)
+        signal: controller.signal,
+      }).then(() => {
+        clearTimeout(timeout)
+        setLandingStep('Landing creada! Video generandose...')
+        fetchLandings()
+        setTimeout(() => {
+          setShowLandingOverlay(false)
+          setGeneratingLanding(null)
+          setActiveTab('landings')
+        }, 1500)
+      }).catch((e) => {
+        clearTimeout(timeout)
+        // Timeout or error — landing was created, show it anyway
+        setLandingStep('Landing creada! La IA sigue generando el video...')
+        fetchLandings()
+        setTimeout(() => {
+          setShowLandingOverlay(false)
+          setGeneratingLanding(null)
+          setActiveTab('landings')
+        }, 1500)
+      })
     } catch {
       setLandingStep('Error de conexion')
       setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null) }, 3000)
