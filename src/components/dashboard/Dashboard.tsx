@@ -401,32 +401,69 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
         return
       }
       const data = await res.json()
+      const landingId = data.landing.id
 
-      // Step 2: Generate video — this endpoint waits until video is ready and saves it
-      setLandingStep('Generando video UGC con IA... Aguarde un momento.')
+      // Step 2: Start video generation (fast, returns task ID)
       const mediaRes = await fetch('/api/landings/process-media', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ landingId: data.landing.id }),
+        body: JSON.stringify({ landingId }),
       })
 
       if (mediaRes.ok) {
         const mediaData = await mediaRes.json()
         if (mediaData.videoUrl) {
+          // Video already existed
           setLandingStep('Landing creada con video!')
-        } else {
-          setLandingStep('Landing creada')
+          fetchLandings()
+          setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null); setActiveTab('landings') }, 1500)
+          return
         }
-      } else {
-        setLandingStep('Landing creada (el video se generara en segundo plano)')
+
+        if (mediaData.videoTaskId) {
+          // Poll for video completion with live timer
+          let seconds = 0
+          const timer = setInterval(() => {
+            seconds++
+            setLandingStep(`Generando video UGC... ${seconds}s`)
+          }, 1000)
+
+          const pollVideo = async () => {
+            for (let i = 0; i < 40; i++) {
+              await new Promise(r => setTimeout(r, 3000))
+              try {
+                const statusRes = await fetch(`/api/video/status?landingId=${landingId}`)
+                const statusData = await statusRes.json()
+                if (statusData.status === 'done' && statusData.videoUrl) {
+                  clearInterval(timer)
+                  setLandingStep('Landing creada con video!')
+                  fetchLandings()
+                  setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null); setActiveTab('landings') }, 1500)
+                  return
+                }
+                if (statusData.status === 'video_failed') {
+                  clearInterval(timer)
+                  setLandingStep('Landing creada (el video fallo, podes reintentar)')
+                  fetchLandings()
+                  setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null); setActiveTab('landings') }, 2000)
+                  return
+                }
+              } catch { /* keep polling */ }
+            }
+            clearInterval(timer)
+            setLandingStep('Landing creada (timeout de video)')
+            fetchLandings()
+            setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null); setActiveTab('landings') }, 2000)
+          }
+          pollVideo()
+          return
+        }
       }
 
+      // Fallback: show landing without video
+      setLandingStep('Landing creada')
       fetchLandings()
-      setTimeout(() => {
-        setShowLandingOverlay(false)
-        setGeneratingLanding(null)
-        setActiveTab('landings')
-      }, 1500)
+      setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null); setActiveTab('landings') }, 1500)
     } catch {
       setLandingStep('Error de conexion')
       setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null) }, 3000)
