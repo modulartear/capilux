@@ -388,7 +388,6 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
     setShowLandingOverlay(true)
     setLandingStep('Creando landing...')
     try {
-      // Step 1: Create landing instantly
       const res = await fetch('/api/landings/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -401,32 +400,23 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
         return
       }
       const data = await res.json()
-      const landingId = data.landing.id
 
-      // Step 2: Start media processing (images, audio, video) — fire and forget
-      setLandingStep('Generando imagenes, audio y video con IA...')
+      // Fire process-media in background (don't wait for it)
+      // The server keeps processing even if client moves on
       fetch('/api/landings/process-media', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ landingId }),
-      }).then(() => {
-        setLandingStep('Landing creada exitosamente!')
-        fetchLandings()
-        setTimeout(() => {
-          setShowLandingOverlay(false)
-          setGeneratingLanding(null)
-          setActiveTab('landings')
-        }, 1500)
-      }).catch(() => {
-        // Media processing failed but landing was created
-        setLandingStep('Landing creada (media se procesara en segundo plano)')
-        fetchLandings()
-        setTimeout(() => {
-          setShowLandingOverlay(false)
-          setGeneratingLanding(null)
-          setActiveTab('landings')
-        }, 2000)
-      })
+        body: JSON.stringify({ landingId: data.landing.id }),
+      }).catch(() => {})
+
+      // Show landing immediately — media generates in background
+      setLandingStep('Landing creada! La IA esta generando imagenes y video...')
+      fetchLandings()
+      setTimeout(() => {
+        setShowLandingOverlay(false)
+        setGeneratingLanding(null)
+        setActiveTab('landings')
+      }, 1500)
     } catch {
       setLandingStep('Error de conexion')
       setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null) }, 3000)

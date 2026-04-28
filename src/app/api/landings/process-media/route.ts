@@ -20,6 +20,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Landing no encontrada' }, { status: 404 })
     }
 
+    // Idempotent: if video already exists or video task already created, skip
+    if (landing.videoUrl) {
+      return NextResponse.json({ success: true, alreadyDone: true })
+    }
+    const existingTask = await db.config.findUnique({ where: { key: `video_task_${landingId}` } })
+    if (existingTask) {
+      return NextResponse.json({ success: true, alreadyProcessing: true, videoTaskId: existingTask.value })
+    }
+
     const productName = landing.productName
     const productDescription = landing.description || ''
     const productImage = landing.heroImage1
