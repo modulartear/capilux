@@ -125,8 +125,8 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
         return
       }
 
-      if (result.status === 'failed' || result.status === 'video_failed') {
-        setVideoStatus('failed')
+      if (result.status === 'failed' || result.status === 'video_failed' || result.status === 'no_task') {
+        setVideoStatus('idle')
         if (pollRef.current) clearInterval(pollRef.current)
         return
       }
@@ -194,15 +194,25 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
             if (landing.audioUrl) setAudioUrl(landing.audioUrl)
 
             if (!landing.videoUrl && landing.id) {
+              // Check status first — only poll if there's an active task
               pollCountRef.current = 0
-              setVideoStatus('processing')
-
-              // Only poll — do NOT trigger process-media here.
-              // Media generation is handled by the Dashboard after landing creation.
-              // First check after 5s
-              setTimeout(() => checkVideoStatus(landing.id), 5000)
-              // Then poll every 3 seconds
-              pollRef.current = setInterval(() => checkVideoStatus(landing.id), 3000)
+              fetch(`/api/video/status?landingId=${landing.id}`)
+                .then(res => res.json())
+                .then(result => {
+                  if (result.status === 'no_task' || result.status === 'video_failed') {
+                    // No active task — show idle with generate button
+                    setVideoStatus('idle')
+                  } else if (result.status === 'done' && result.videoUrl) {
+                    setData(prev => prev ? { ...prev, videoUrl: result.videoUrl } : prev)
+                    setVideoStatus('done')
+                  } else {
+                    // Active task — start polling
+                    setVideoStatus('processing')
+                    setTimeout(() => checkVideoStatusRef.current?.(landing.id), 5000)
+                    pollRef.current = setInterval(() => checkVideoStatusRef.current?.(landing.id), 3000)
+                  }
+                })
+                .catch(() => setVideoStatus('idle'))
             } else if (landing.videoUrl) {
               setVideoStatus('done')
             }

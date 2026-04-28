@@ -44,9 +44,9 @@ export async function GET(request: NextRequest) {
     })
 
     if (!taskConfig) {
-      // No video task yet
+      // No video task — tell client to show idle state with generate button
       return NextResponse.json({
-        status: 'media_processing',
+        status: 'no_task',
         audioUrl: landing.audioUrl || null,
         heroImage1: landing.heroImage1 || null,
         heroImage2: landing.heroImage2 || null,
