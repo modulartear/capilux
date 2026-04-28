@@ -1670,19 +1670,25 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
             <h3 className="text-xl font-bold text-gray-800 mb-2">Creando Landing Page</h3>
             <p className="text-gray-500 text-sm mb-4">La IA esta generando tu pagina de venta...</p>
             <div className="space-y-2 text-left">
-              <div className={`flex items-center gap-2 text-sm ${landingStep.includes('contenido') ? 'text-violet-600' : 'text-gray-400'}`}>
-                {landingStep.includes('contenido') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                Generando contenido persuasivo
+              <div className={`flex items-center gap-2 text-sm ${landingStep.includes('Creando landing') || landingStep.includes('video') || landingStep.includes('creada') ? 'text-violet-600' : 'text-gray-400'}`}>
+                {(landingStep.includes('Creando landing') || landingStep.includes('video') || landingStep.includes('creada')) && !landingStep.includes('con video') ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                Creando landing en base de datos
               </div>
-              <div className={`flex items-center gap-2 text-sm ${landingStep.includes('Imagen') || landingStep.includes('exitosamente') ? 'text-violet-600' : 'text-gray-400'}`}>
-                {landingStep.includes('Imagen') ? <Loader2 className="w-4 h-4 animate-spin" /> : landingStep.includes('exitosamente') ? <Check className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4" />}
-                Creando imagenes con IA
+              <div className={`flex items-center gap-2 text-sm ${landingStep.includes('video UGC') ? 'text-violet-600 font-semibold' : landingStep.includes('con video') ? 'text-emerald-600 font-semibold' : 'text-gray-400'}`}>
+                {landingStep.includes('video UGC') ? <Loader2 className="w-4 h-4 animate-spin" /> : landingStep.includes('con video') ? <Check className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4" />}
+                {landingStep.includes('video UGC') ? <span>Generando video UGC (MiniMax)... <span className="text-violet-700 font-mono text-xs">{landingStep.match(/\d+s/)?.[0] || ''}</span></span> : 'Generando video UGC'}
               </div>
-              <div className={`flex items-center gap-2 text-sm ${landingStep.includes('exitosamente') ? 'text-emerald-600 font-semibold' : 'text-gray-400'}`}>
-                {landingStep.includes('exitosamente') ? <Check className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4" />}
+              <div className={`flex items-center gap-2 text-sm ${landingStep.includes('con video') || landingStep.includes('exitosamente') ? 'text-emerald-600 font-semibold' : 'text-gray-400'}`}>
+                {landingStep.includes('con video') ? <Check className="w-4 h-4 text-emerald-500" /> : <div className="w-4 h-4" />}
                 Publicando landing page
               </div>
             </div>
+            {/* Show real-time status text for error/timeout states */}
+            {landingStep.includes('fallo') || landingStep.includes('timeout') || landingStep.includes('Error') ? (
+              <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <p className="text-amber-700 text-sm font-medium">{landingStep}</p>
+              </div>
+            ) : null}
           </motion.div>
         </div>
       )}

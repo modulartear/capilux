@@ -56,13 +56,14 @@ export async function createVideoTask(params: {
   const payload: Record<string, unknown> = {
     model,
     prompt,
-    // quality: 'standard',  // standard or speed
   }
+
+  // Use speed mode for faster generation
+  payload.quality = 'speed'
 
   // If image provided, use image-to-video mode
   if (params.imageUrl) {
     payload.first_frame_image = params.imageUrl
-    // payload.prompt is used as guidance for the video generation
   }
 
   console.log(`[MiniMax] Creating video task with model: ${model}`)
