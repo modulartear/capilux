@@ -17,8 +17,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Landing no encontrada' }, { status: 404 })
     }
 
-    // Skip if images already generated
-    if (landing.beforeAfterImages) {
+    // Skip if images already generated (must have at least 1 image)
+    let existingImages: { url: string; label: string }[] = []
+    try { existingImages = JSON.parse(landing.beforeAfterImages || '[]') } catch { existingImages = [] }
+    if (existingImages.length > 0) {
       return NextResponse.json({
         success: true,
         images: landing.beforeAfterImages,

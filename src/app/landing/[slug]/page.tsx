@@ -118,12 +118,16 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
             try { setTestimonials(JSON.parse(landing.testimonials)) } catch { setTestimonials([]) }
             try { setFaq(JSON.parse(landing.faq)) } catch { setFaq([]) }
 
-            // Parse before/after images if they exist
+            // Parse before/after images if they exist and have content
+            let parsedImages: { url: string; label: string }[] = []
             if (landing.beforeAfterImages) {
               try {
-                setImages(JSON.parse(landing.beforeAfterImages))
-                setImageStatus('done')
-              } catch { setImages([]) }
+                parsedImages = JSON.parse(landing.beforeAfterImages)
+              } catch { parsedImages = [] }
+            }
+            if (parsedImages.length > 0) {
+              setImages(parsedImages)
+              setImageStatus('done')
             }
           }
         })
