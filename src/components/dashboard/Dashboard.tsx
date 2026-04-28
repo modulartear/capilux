@@ -404,26 +404,26 @@ export default function Dashboard({ onGoBack }: DashboardProps) {
       const data = await res.json()
       const landingId = data.landing.id
 
-      // Step 2: Generate before/after images (synchronous, ~15-30s)
+      // Step 2: Generate 3 before/after images (one by one)
       setLandingStep('Generando fotos antes/despues...')
-      const mediaRes = await fetch('/api/landings/process-media', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ landingId }),
-      })
-
-      if (mediaRes.ok) {
-        const mediaData = await mediaRes.json()
-        if (mediaData.images) {
-          setLandingStep('Landing creada con fotos!')
-          fetchLandings()
-          setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null); setActiveTab('landings') }, 1500)
-          return
-        }
+      let generatedCount = 0
+      for (let i = 0; i < 3; i++) {
+        setLandingStep(`Generando foto ${i + 1} de 3...`)
+        try {
+          const mediaRes = await fetch('/api/landings/process-media', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ landingId, imageIndex: i }),
+          })
+          if (mediaRes.ok) generatedCount++
+        } catch { /* continue */ }
       }
 
-      // Fallback: show landing without images
-      setLandingStep('Landing creada')
+      if (generatedCount > 0) {
+        setLandingStep('Landing creada con fotos!')
+      } else {
+        setLandingStep('Landing creada')
+      }
       fetchLandings()
       setTimeout(() => { setShowLandingOverlay(false); setGeneratingLanding(null); setActiveTab('landings') }, 1500)
     } catch {

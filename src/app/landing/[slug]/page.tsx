@@ -74,33 +74,42 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
   const [images, setImages] = useState<{ url: string; label: string }[]>([])
   const [imageStatus, setImageStatus] = useState<'idle' | 'generating' | 'done'>('idle')
   const [generatingImages, setGeneratingImages] = useState(false)
+  const [generatingProgress, setGeneratingProgress] = useState(0)
   const dataRef = useRef<LandingData | null>(null)
 
   // Keep dataRef in sync
   useEffect(() => { dataRef.current = data }, [data])
 
-  // Generate before/after images
+  // Generate 3 before/after images, one by one with progress
   const handleGenerateImages = useCallback(async () => {
     if (!dataRef.current?.id || generatingImages) return
     setGeneratingImages(true)
     setImageStatus('generating')
-    try {
-      const res = await fetch('/api/landings/process-media', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ landingId: dataRef.current!.id }),
-      })
-      const mediaData = await res.json()
-      if (mediaData.images) {
-        try { setImages(JSON.parse(mediaData.images)) } catch { setImages([]) }
-        setImageStatus('done')
-      } else {
-        setImageStatus('idle')
+    setGeneratingProgress(0)
+
+    const landingId = dataRef.current!.id
+    const labels = ['Antes', 'Despues de 2 semanas', 'Despues de 1 mes']
+    const allImages: { url: string; label: string }[] = []
+
+    for (let i = 0; i < 3; i++) {
+      try {
+        const res = await fetch('/api/landings/process-media', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ landingId, imageIndex: i }),
+        })
+        const mediaData = await res.json()
+        if (mediaData.image) {
+          allImages.push(mediaData.image)
+          setImages([...allImages])
+        }
+      } catch (err) {
+        console.error(`Failed to generate image ${i}:`, err)
       }
-    } catch (err) {
-      console.error('Failed to generate images:', err)
-      setImageStatus('idle')
+      setGeneratingProgress(i + 1)
     }
+
+    setImageStatus(allImages.length > 0 ? 'done' : 'idle')
     setGeneratingImages(false)
   }, [generatingImages])
 
@@ -283,10 +292,40 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
                 ))}
               </div>
             ) : imageStatus === 'generating' ? (
-              <div className="bg-white rounded-2xl p-12 shadow-lg border border-gray-100">
-                <Loader2 className="w-12 h-12 text-emerald-500 animate-spin mx-auto mb-4" />
-                <p className="text-gray-800 font-semibold text-lg">Generando fotos con IA...</p>
-                <p className="text-gray-400 text-sm mt-2">Creando las imagenes de antes y despues. Esto tarda unos segundos.</p>
+              <div className="space-y-4">
+                <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 text-center">
+                  <Loader2 className="w-10 h-10 text-emerald-500 animate-spin mx-auto mb-3" />
+                  <p className="text-gray-800 font-semibold">Generando fotos con IA...</p>
+                  <p className="text-gray-400 text-sm mt-1">Imagen {generatingProgress} de 3</p>
+                  <div className="flex gap-2 justify-center mt-4">
+                    {[0, 1, 2].map(i => (
+                      <div key={i} className={`w-3 h-3 rounded-full transition-colors ${i < generatingProgress ? 'bg-emerald-500' : 'bg-gray-200'}`} />
+                    ))}
+                  </div>
+                </div>
+                {/* Show images as they appear */}
+                {images.length > 0 && (
+                  <div className={`grid grid-cols-${images.length} sm:grid-cols-${images.length} gap-4 sm:gap-6`}>
+                    {images.map((img, i) => (
+                      <motion.div
+                        key={i}
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        className="relative group"
+                      >
+                        <div className="relative overflow-hidden rounded-2xl shadow-lg border-2 border-white aspect-square">
+                          <img src={img.url} alt={img.label} className="w-full h-full object-cover" />
+                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                          <div className="absolute bottom-0 left-0 right-0 p-4">
+                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${i === 0 ? 'bg-red-500 text-white' : i === 1 ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'}`}>
+                              {img.label}
+                            </span>
+                          </div>
+                        </div>
+                      </motion.div>
+                    ))}
+                  </div>
+                )}
               </div>
             ) : (
               <div className="bg-white rounded-2xl p-12 shadow-lg border border-gray-100">
