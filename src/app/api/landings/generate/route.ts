@@ -202,7 +202,6 @@ async function processLandingMedia(landingId: string, productName: string, produ
       image_url: videoImage,
       quality: 'speed',
       duration: 5,
-      fps: 24,
       size: '1024x576',
     })
     console.log(`Video task created: ${task.id} for landing ${landingId}`)
