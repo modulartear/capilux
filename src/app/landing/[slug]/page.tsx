@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import {
   Star,
@@ -16,8 +16,10 @@ import {
   Clock,
   ArrowRight,
   Loader2,
-  ImageIcon,
-  Camera,
+  Video,
+  Upload,
+  Play,
+  X,
 } from 'lucide-react'
 
 interface Testimonial {
@@ -53,7 +55,6 @@ interface LandingData {
   heroImage2: string | null
   videoUrl: string | null
   audioUrl: string | null
-  beforeAfterImages: string | null
   urgencyText: string
   product?: {
     price: number
@@ -71,49 +72,84 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
   const [benefits, setBenefits] = useState<Benefit[]>([])
   const [testimonials, setTestimonials] = useState<Testimonial[]>([])
   const [faq, setFaq] = useState<FAQItem[]>([])
-  const [images, setImages] = useState<{ url: string; label: string }[]>([])
-  const [imageStatus, setImageStatus] = useState<'idle' | 'generating' | 'done'>('idle')
-  const [generatingImages, setGeneratingImages] = useState(false)
-  const [generatingProgress, setGeneratingProgress] = useState(0)
+
+  // Video upload state
+  const [uploading, setUploading] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
+  const [uploadError, setUploadError] = useState('')
+  const [videoSrc, setVideoSrc] = useState<string | null>(null)
+  const [showVideoModal, setShowVideoModal] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const dataRef = useRef<LandingData | null>(null)
 
-  // Keep dataRef in sync
   useEffect(() => { dataRef.current = data }, [data])
 
-  // Generate 3 before/after images, one by one with progress
-  const handleGenerateImages = useCallback(async () => {
-    if (!dataRef.current?.id || generatingImages) return
-    setGeneratingImages(true)
-    setImageStatus('generating')
-    setGeneratingProgress(0)
+  // Handle video file selection and upload
+  const handleVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !dataRef.current?.id) return
 
-    const landingId = dataRef.current!.id
-    const labels = ['Antes', 'Despues de 2 semanas', 'Despues de 1 mes']
-    const allImages: { url: string; label: string }[] = []
-
-    for (let i = 0; i < 3; i++) {
-      try {
-        const res = await fetch('/api/landings/process-media', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ landingId, imageIndex: i }),
-        })
-        const mediaData = await res.json()
-        if (mediaData.image) {
-          allImages.push(mediaData.image)
-          setImages([...allImages])
-        }
-      } catch (err) {
-        console.error(`Failed to generate image ${i}:`, err)
-      }
-      setGeneratingProgress(i + 1)
+    // Validate size client-side (50MB)
+    if (file.size > 50 * 1024 * 1024) {
+      setUploadError('El video es muy grande. Maximo 50MB')
+      return
     }
 
-    setImageStatus(allImages.length > 0 ? 'done' : 'idle')
-    setGeneratingImages(false)
-  }, [generatingImages])
+    setUploading(true)
+    setUploadProgress(0)
+    setUploadError('')
 
-  // On load, check if images already exist
+    try {
+      const formData = new FormData()
+      formData.append('landingId', dataRef.current.id)
+      formData.append('video', file)
+
+      // Use XMLHttpRequest for progress tracking
+      const result = await new Promise<{ success: boolean; message?: string; error?: string }>((resolve, reject) => {
+        const xhr = new XMLHttpRequest()
+        xhr.open('POST', '/api/landings/upload-video')
+
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) {
+            setUploadProgress(Math.round((e.loaded / e.total) * 100))
+          }
+        }
+
+        xhr.onload = () => {
+          try {
+            const data = JSON.parse(xhr.responseText)
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve(data)
+            } else {
+              resolve({ success: false, error: data.error || 'Error al subir' })
+            }
+          } catch {
+            resolve({ success: false, error: 'Error de servidor' })
+          }
+        }
+
+        xhr.onerror = () => resolve({ success: false, error: 'Error de conexion' })
+        xhr.send(formData)
+      })
+
+      if (result.success) {
+        // Read the file locally to show preview
+        const reader = new FileReader()
+        reader.onload = (ev) => {
+          setVideoSrc(ev.target?.result as string)
+        }
+        reader.readAsDataURL(file)
+      } else {
+        setUploadError(result.error || 'Error al subir el video')
+      }
+    } catch (err: any) {
+      setUploadError(err.message || 'Error al subir el video')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  // Load landing data
   useEffect(() => {
     params.then(({ slug }) => {
       fetch(`/api/landings/${slug}`)
@@ -127,16 +163,9 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
             try { setTestimonials(JSON.parse(landing.testimonials)) } catch { setTestimonials([]) }
             try { setFaq(JSON.parse(landing.faq)) } catch { setFaq([]) }
 
-            // Parse before/after images if they exist and have content
-            let parsedImages: { url: string; label: string }[] = []
-            if (landing.beforeAfterImages) {
-              try {
-                parsedImages = JSON.parse(landing.beforeAfterImages)
-              } catch { parsedImages = [] }
-            }
-            if (parsedImages.length > 0) {
-              setImages(parsedImages)
-              setImageStatus('done')
+            // Load video if exists
+            if (landing.videoUrl) {
+              setVideoSrc(landing.videoUrl)
             }
           }
         })
@@ -178,6 +207,23 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Video Modal Overlay */}
+      {showVideoModal && videoSrc && (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setShowVideoModal(false)}>
+          <div className="relative w-full max-w-4xl" onClick={e => e.stopPropagation()}>
+            <button onClick={() => setShowVideoModal(false)} className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors">
+              <X className="w-8 h-8" />
+            </button>
+            <video
+              src={videoSrc}
+              controls
+              autoPlay
+              className="w-full rounded-2xl shadow-2xl"
+            />
+          </div>
+        </div>
+      )}
+
       {/* SECTION 1: HERO + SOCIAL PROOF BAR */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-emerald-50 via-white to-teal-50" />
@@ -247,101 +293,96 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
         </div>
       </section>
 
-      {/* SECTION 2: BEFORE / AFTER PHOTO BOOK */}
+      {/* SECTION 2: VIDEO / UPLOAD */}
       <section className="py-12 sm:py-16 bg-gray-50">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <motion.div initial={{ opacity: 0, y: 20 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}>
-            <p className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">Resultados Reales</p>
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Antes y Despues</h2>
-            <p className="text-gray-500 mb-8 max-w-lg mx-auto">Mirá los resultados reales de nuestros clientes que ya probaron {data.productName}</p>
+            <p className="text-sm font-semibold text-emerald-600 uppercase tracking-wider mb-3">Testimonio en Video</p>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Mira los Resultados Reales</h2>
+            <p className="text-gray-500 mb-8 max-w-lg mx-auto">Clientes reales contando su experiencia con {data.productName}</p>
 
-            {imageStatus === 'done' && images.length > 0 ? (
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
-                {images.map((img, i) => (
-                  <motion.div
-                    key={i}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: i * 0.15 }}
-                    className="relative group"
-                  >
-                    <div className="relative overflow-hidden rounded-2xl shadow-lg border-2 border-white aspect-square">
-                      <img
-                        src={img.url}
-                        alt={img.label}
-                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                      />
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                      <div className="absolute bottom-0 left-0 right-0 p-4">
-                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${i === 0 ? 'bg-red-500 text-white' : i === 1 ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'}`}>
-                          {img.label}
-                        </span>
-                      </div>
+            {videoSrc ? (
+              /* VIDEO DISPLAY */
+              <div className="relative">
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="relative rounded-2xl shadow-2xl overflow-hidden cursor-pointer group"
+                  onClick={() => setShowVideoModal(true)}
+                >
+                  <video
+                    src={videoSrc}
+                    className="w-full rounded-2xl"
+                    preload="metadata"
+                    muted
+                    playsInline
+                  />
+                  {/* Play overlay */}
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/40 transition-colors">
+                    <div className="w-20 h-20 bg-white/90 rounded-full flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
+                      <Play className="w-10 h-10 text-emerald-600 ml-1" />
                     </div>
-                    {i === 0 && (
-                      <div className="absolute -top-3 -right-3 w-8 h-8 bg-red-500 rounded-full flex items-center justify-center shadow-lg">
-                        <Camera className="w-4 h-4 text-white" />
-                      </div>
-                    )}
-                    {i === images.length - 1 && (
-                      <div className="absolute -top-3 -right-3 w-8 h-8 bg-emerald-500 rounded-full flex items-center justify-center shadow-lg">
-                        <CheckCircle2 className="w-4 h-4 text-white" />
-                      </div>
-                    )}
-                  </motion.div>
-                ))}
-              </div>
-            ) : imageStatus === 'generating' ? (
-              <div className="space-y-4">
-                <div className="bg-white rounded-2xl p-6 shadow-lg border border-gray-100 text-center">
-                  <Loader2 className="w-10 h-10 text-emerald-500 animate-spin mx-auto mb-3" />
-                  <p className="text-gray-800 font-semibold">Generando fotos con IA...</p>
-                  <p className="text-gray-400 text-sm mt-1">Imagen {generatingProgress} de 3</p>
-                  <div className="flex gap-2 justify-center mt-4">
-                    {[0, 1, 2].map(i => (
-                      <div key={i} className={`w-3 h-3 rounded-full transition-colors ${i < generatingProgress ? 'bg-emerald-500' : 'bg-gray-200'}`} />
-                    ))}
                   </div>
+                </motion.div>
+                {/* Upload new video button */}
+                <div className="mt-4">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={uploading}
+                    className="text-sm text-gray-400 hover:text-emerald-600 transition-colors underline underline-offset-4"
+                  >
+                    Cambiar video
+                  </button>
                 </div>
-                {/* Show images as they appear */}
-                {images.length > 0 && (
-                  <div className={`grid grid-cols-${images.length} sm:grid-cols-${images.length} gap-4 sm:gap-6`}>
-                    {images.map((img, i) => (
-                      <motion.div
-                        key={i}
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        className="relative group"
-                      >
-                        <div className="relative overflow-hidden rounded-2xl shadow-lg border-2 border-white aspect-square">
-                          <img src={img.url} alt={img.label} className="w-full h-full object-cover" />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                          <div className="absolute bottom-0 left-0 right-0 p-4">
-                            <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold ${i === 0 ? 'bg-red-500 text-white' : i === 1 ? 'bg-amber-500 text-white' : 'bg-emerald-500 text-white'}`}>
-                              {img.label}
-                            </span>
-                          </div>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                )}
+              </div>
+            ) : uploading ? (
+              /* UPLOAD PROGRESS */
+              <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 max-w-md mx-auto">
+                <div className="w-16 h-16 bg-emerald-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Upload className="w-8 h-8 text-emerald-600 animate-bounce" />
+                </div>
+                <p className="text-gray-800 font-semibold text-lg mb-2">Subiendo video...</p>
+                <p className="text-gray-400 text-sm mb-6">{uploadProgress}% completado</p>
+                <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden">
+                  <motion.div
+                    className="h-full bg-emerald-500 rounded-full"
+                    initial={{ width: 0 }}
+                    animate={{ width: `${uploadProgress}%` }}
+                    transition={{ duration: 0.3 }}
+                  />
+                </div>
               </div>
             ) : (
-              <div className="bg-white rounded-2xl p-12 shadow-lg border border-gray-100">
-                <ImageIcon className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-800 font-semibold text-lg mb-2">Fotos Antes y Despues</p>
-                <p className="text-gray-400 text-sm mb-6">Aun no se generaron las imagenes de resultados</p>
+              /* UPLOAD PLACEHOLDER */
+              <div className="bg-white rounded-2xl p-12 shadow-lg border-2 border-dashed border-gray-200 hover:border-emerald-400 transition-colors max-w-md mx-auto">
+                <div className="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Video className="w-8 h-8 text-gray-300" />
+                </div>
+                <p className="text-gray-800 font-semibold text-lg mb-2">Subir Video</p>
+                <p className="text-gray-400 text-sm mb-6">Aun no se cargo ningun video. Subi uno desde tu PC para mostrar testimonios reales.</p>
                 <button
-                  onClick={handleGenerateImages}
-                  disabled={generatingImages}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={uploading}
                   className="px-6 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-300 text-white font-semibold rounded-xl transition-all text-sm shadow-lg hover:shadow-emerald-500/30 inline-flex items-center gap-2"
                 >
-                  <Camera className="w-4 h-4" />
-                  {generatingImages ? 'Generando...' : 'Generar Fotos con IA'}
+                  <Upload className="w-4 h-4" />
+                  Elegir Video
                 </button>
+                <p className="text-gray-300 text-xs mt-4">MP4, WebM, MOV o AVI — Maximo 50MB</p>
+                {uploadError && (
+                  <p className="text-red-500 text-sm mt-3">{uploadError}</p>
+                )}
               </div>
             )}
+
+            {/* Hidden file input */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/mp4,video/webm,video/quicktime,video/x-msvideo,.mp4,.webm,.mov,.avi"
+              onChange={handleVideoSelect}
+              className="hidden"
+            />
           </motion.div>
         </div>
       </section>
