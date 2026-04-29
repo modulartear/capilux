@@ -1,19 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import { writeFile, mkdir, readdir, readFile, unlink } from 'fs/promises'
+import { writeFile, mkdir, readdir, readFile, unlink, rm } from 'fs/promises'
 import { join } from 'path'
 
 export const maxDuration = 120
 
 const CHUNK_DIR = '/tmp/video_uploads'
-const FINAL_DIR = '/tmp/videos'
-const CHUNK_SIZE = 500_000 // 500KB per chunk — safe for any proxy limit
 
-// POST: Upload a video chunk, or finalize assembly
-// Body JSON: { landingId, action, ... }
-//   action="info"    → returns { totalChunks } — client asks how many chunks needed
+// POST: Upload a video in chunks, then assemble and save as base64 to DB
 //   action="chunk"   → { landingId, chunkIndex, totalChunks, data (base64), fileName, fileType }
-//   action="done"    → { landingId, totalChunks, fileName, fileType } → assembles and saves to DB
+//   action="done"    → { landingId, totalChunks, fileName, fileType } → assembles chunks, saves base64 to DB
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
@@ -42,16 +38,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, chunkIndex, totalChunks })
     }
 
-    // --- ACTION: done (assemble) ---
+    // --- ACTION: done (assemble chunks into base64, save to DB) ---
     if (action === 'done') {
       const { totalChunks, fileName, fileType } = body
       const chunkDir = join(CHUNK_DIR, landingId)
-      await mkdir(FINAL_DIR, { recursive: true })
 
-      const ext = getExtension(fileName || 'video.mp4')
-      const finalPath = join(FINAL_DIR, `${landingId}.${ext}`)
-
-      // Assemble all chunks
+      // Assemble all chunks into one Buffer
       const bufferParts: Buffer[] = []
       for (let i = 0; i < totalChunks; i++) {
         const chunkPath = join(chunkDir, `chunk_${i}`)
@@ -60,34 +52,32 @@ export async function POST(request: NextRequest) {
           bufferParts.push(chunk)
         } catch (err) {
           console.error(`[upload-video] Missing chunk ${i} for ${landingId}`)
-          return NextResponse.json({ error: `Falta el chunk ${i}` }, { status: 400 })
+          // Clean up and abort
+          try { await rm(chunkDir, { recursive: true, force: true }) } catch {}
+          return NextResponse.json({ error: `Falta el chunk ${i}. Volvé a subir el video.` }, { status: 400 })
         }
       }
 
       const finalBuffer = Buffer.concat(bufferParts)
-      await writeFile(finalPath, finalBuffer)
+      const base64 = finalBuffer.toString('base64')
+      const mimeType = fileType || 'video/mp4'
+      const videoDataUrl = `data:${mimeType};base64,${base64}`
 
-      // Clean up chunks
-      try {
-        const files = await readdir(chunkDir)
-        for (const f of files) {
-          await unlink(join(chunkDir, f))
-        }
-      } catch {}
+      // Clean up chunks from /tmp
+      try { await rm(chunkDir, { recursive: true, force: true }) } catch {}
 
-      // Save URL to DB — serve via API route
-      const videoUrl = `/api/landings/serve-video?landingId=${landingId}`
+      // Save base64 data URL to DB
       await db.landingPage.update({
         where: { id: landingId },
-        data: { videoUrl },
+        data: { videoUrl: videoDataUrl },
       })
 
-      console.log(`[upload-video] Video assembled for landing ${landingId}: ${(finalBuffer.length / 1024 / 1024).toFixed(1)}MB, ${totalChunks} chunks`)
+      console.log(`[upload-video] Video saved to DB for landing ${landingId}: ${(finalBuffer.length / 1024 / 1024).toFixed(1)}MB, ${totalChunks} chunks`)
       return NextResponse.json({
         success: true,
         message: 'Video subido correctamente',
         videoSize: finalBuffer.length,
-        videoUrl,
+        videoUrl: videoDataUrl,
       })
     }
 
@@ -96,9 +86,4 @@ export async function POST(request: NextRequest) {
     console.error('[upload-video] Error:', error)
     return NextResponse.json({ error: error.message || 'Error al subir el video' }, { status: 500 })
   }
-}
-
-function getExtension(fileName: string): string {
-  const match = fileName.match(/\.(mp4|webm|mov|avi|mkv)$/i)
-  return match ? match[1].toLowerCase() : 'mp4'
 }

@@ -167,7 +167,7 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
       setUploadProgress(100)
       setVideoLoaded(false)
 
-      // Set video source to the serve endpoint
+      // Set video source from the base64 data URL returned by the server
       if (doneData.videoUrl) {
         setVideoSrc(doneData.videoUrl)
       }
