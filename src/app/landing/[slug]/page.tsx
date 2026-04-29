@@ -84,7 +84,7 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
 
   useEffect(() => { dataRef.current = data }, [data])
 
-  // Handle video file selection and upload
+  // Chunked video upload — splits file into 500KB chunks to avoid 413 errors
   const handleVideoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file || !dataRef.current?.id) return
@@ -100,47 +100,73 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
     setUploadError('')
 
     try {
-      const formData = new FormData()
-      formData.append('landingId', dataRef.current.id)
-      formData.append('video', file)
+      const CHUNK_SIZE = 500_000 // 500KB per chunk
+      const landingId = dataRef.current.id
+      const totalChunks = Math.ceil(file.size / CHUNK_SIZE)
 
-      // Use XMLHttpRequest for progress tracking
-      const result = await new Promise<{ success: boolean; message?: string; error?: string }>((resolve, reject) => {
-        const xhr = new XMLHttpRequest()
-        xhr.open('POST', '/api/landings/upload-video')
+      // Read entire file as ArrayBuffer
+      const arrayBuffer = await file.arrayBuffer()
+      const uint8 = new Uint8Array(arrayBuffer)
 
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) {
-            setUploadProgress(Math.round((e.loaded / e.total) * 100))
-          }
+      // Send chunks one by one
+      for (let i = 0; i < totalChunks; i++) {
+        const start = i * CHUNK_SIZE
+        const end = Math.min(start + CHUNK_SIZE, file.size)
+        const chunkData = uint8.slice(start, end)
+
+        // Convert chunk to base64
+        let binary = ''
+        for (let j = 0; j < chunkData.length; j++) {
+          binary += String.fromCharCode(chunkData[j])
+        }
+        const base64Chunk = btoa(binary)
+
+        const res = await fetch('/api/landings/upload-video', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            landingId,
+            action: 'chunk',
+            chunkIndex: i,
+            totalChunks,
+            data: base64Chunk,
+            fileName: file.name,
+            fileType: file.type,
+          }),
+        })
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({ error: 'Error subiendo chunk' }))
+          throw new Error(err.error || `Error en chunk ${i}`)
         }
 
-        xhr.onload = () => {
-          try {
-            const data = JSON.parse(xhr.responseText)
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve(data)
-            } else {
-              resolve({ success: false, error: data.error || 'Error al subir' })
-            }
-          } catch {
-            resolve({ success: false, error: 'Error de servidor' })
-          }
-        }
+        setUploadProgress(Math.round(((i + 1) / totalChunks) * 90)) // reserve 10% for assembly
+      }
 
-        xhr.onerror = () => resolve({ success: false, error: 'Error de conexion' })
-        xhr.send(formData)
+      // Finalize: assemble chunks on server
+      setUploadProgress(92)
+      const doneRes = await fetch('/api/landings/upload-video', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          landingId,
+          action: 'done',
+          totalChunks,
+          fileName: file.name,
+          fileType: file.type,
+        }),
       })
 
-      if (result.success) {
-        // Read the file locally to show preview
-        const reader = new FileReader()
-        reader.onload = (ev) => {
-          setVideoSrc(ev.target?.result as string)
-        }
-        reader.readAsDataURL(file)
-      } else {
-        setUploadError(result.error || 'Error al subir el video')
+      const doneData = await doneRes.json()
+      if (!doneRes.ok || !doneData.success) {
+        throw new Error(doneData.error || 'Error ensamblando el video')
+      }
+
+      setUploadProgress(100)
+
+      // Set video source to the serve endpoint
+      if (doneData.videoUrl) {
+        setVideoSrc(doneData.videoUrl)
       }
     } catch (err: any) {
       setUploadError(err.message || 'Error al subir el video')
@@ -165,7 +191,13 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
 
             // Load video if exists
             if (landing.videoUrl) {
-              setVideoSrc(landing.videoUrl)
+              if (landing.videoUrl.startsWith('data:')) {
+                // Legacy base64 data URL
+                setVideoSrc(landing.videoUrl)
+              } else {
+                // API serve URL
+                setVideoSrc(landing.videoUrl)
+              }
             }
           }
         })
