@@ -79,7 +79,9 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
   const [uploadError, setUploadError] = useState('')
   const [videoSrc, setVideoSrc] = useState<string | null>(null)
   const [showVideoModal, setShowVideoModal] = useState(false)
+  const [videoLoaded, setVideoLoaded] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const videoRef = useRef<HTMLVideoElement>(null)
   const dataRef = useRef<LandingData | null>(null)
 
   useEffect(() => { dataRef.current = data }, [data])
@@ -163,6 +165,7 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
       }
 
       setUploadProgress(100)
+      setVideoLoaded(false)
 
       // Set video source to the serve endpoint
       if (doneData.videoUrl) {
@@ -191,13 +194,8 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
 
             // Load video if exists
             if (landing.videoUrl) {
-              if (landing.videoUrl.startsWith('data:')) {
-                // Legacy base64 data URL
-                setVideoSrc(landing.videoUrl)
-              } else {
-                // API serve URL
-                setVideoSrc(landing.videoUrl)
-              }
+              setVideoSrc(landing.videoUrl)
+              setVideoLoaded(false)
             }
           }
         })
@@ -237,20 +235,27 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
     }
   }
 
+  // Play video in modal
+  const handlePlayVideo = () => {
+    setShowVideoModal(true)
+  }
+
   return (
     <div className="min-h-screen bg-white">
       {/* Video Modal Overlay */}
       {showVideoModal && videoSrc && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4" onClick={() => setShowVideoModal(false)}>
+        <div className="fixed inset-0 z-50 bg-black/90 flex items-center justify-center p-4" onClick={() => setShowVideoModal(false)}>
           <div className="relative w-full max-w-4xl" onClick={e => e.stopPropagation()}>
-            <button onClick={() => setShowVideoModal(false)} className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors">
+            <button onClick={() => setShowVideoModal(false)} className="absolute -top-12 right-0 text-white hover:text-gray-300 transition-colors z-10">
               <X className="w-8 h-8" />
             </button>
             <video
+              ref={videoRef}
               src={videoSrc}
               controls
               autoPlay
-              className="w-full rounded-2xl shadow-2xl"
+              playsInline
+              className="w-full rounded-2xl shadow-2xl bg-black"
             />
           </div>
         </div>
@@ -334,39 +339,73 @@ export default function LandingPage({ params }: { params: Promise<{ slug: string
             <p className="text-gray-500 mb-8 max-w-lg mx-auto">Clientes reales contando su experiencia con {data.productName}</p>
 
             {videoSrc ? (
-              /* VIDEO DISPLAY */
-              <div className="relative">
-                <motion.div
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  className="relative rounded-2xl shadow-2xl overflow-hidden cursor-pointer group"
-                  onClick={() => setShowVideoModal(true)}
+              /* VIDEO DISPLAY - shows thumbnail with play overlay */
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+              >
+                <div
+                  className="relative rounded-2xl shadow-2xl overflow-hidden cursor-pointer group aspect-video bg-gradient-to-br from-emerald-600 to-teal-700"
+                  onClick={handlePlayVideo}
                 >
+                  {/* Video element for thumbnail - loads first frame */}
                   <video
+                    ref={videoRef}
                     src={videoSrc}
-                    className="w-full rounded-2xl"
-                    preload="metadata"
+                    className={`w-full h-full object-cover transition-opacity duration-500 ${videoLoaded ? 'opacity-100' : 'opacity-0'}`}
+                    preload="auto"
                     muted
                     playsInline
+                    onLoadedData={() => setVideoLoaded(true)}
+                    onError={() => setVideoLoaded(false)}
                   />
-                  {/* Play overlay */}
-                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center group-hover:bg-black/40 transition-colors">
-                    <div className="w-20 h-20 bg-white/90 rounded-full flex items-center justify-center shadow-xl group-hover:scale-110 transition-transform">
-                      <Play className="w-10 h-10 text-emerald-600 ml-1" />
+
+                  {/* Gradient overlay behind video (visible while loading) */}
+                  <div className={`absolute inset-0 bg-gradient-to-br from-emerald-600 to-teal-700 transition-opacity duration-500 ${videoLoaded ? 'opacity-0' : 'opacity-100'}`}>
+                    <div className="absolute inset-0 flex flex-col items-center justify-center">
+                      {data.heroImage1 ? (
+                        <img src={data.heroImage1} alt={data.productName} className="w-24 h-24 rounded-full object-cover border-4 border-white/30 mb-4 opacity-60" />
+                      ) : (
+                        <Video className="w-16 h-16 text-white/50 mb-4" />
+                      )}
+                      <p className="text-white/80 font-semibold">{data.productName}</p>
+                      {!videoLoaded && (
+                        <p className="text-white/50 text-sm mt-1">Cargando video...</p>
+                      )}
                     </div>
                   </div>
-                </motion.div>
+
+                  {/* Play button overlay - always visible */}
+                  <div className="absolute inset-0 bg-black/25 flex items-center justify-center group-hover:bg-black/35 transition-all duration-300">
+                    <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center shadow-2xl group-hover:scale-110 transition-transform duration-300">
+                      <Play className="w-10 h-10 text-emerald-600 ml-1" fill="currentColor" />
+                    </div>
+                  </div>
+
+                  {/* Bottom gradient with label */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-6">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse" />
+                        <span className="text-white/90 text-sm font-medium">Testimonio en Video</span>
+                      </div>
+                      <span className="text-white/60 text-xs flex items-center gap-1">
+                        <Play className="w-3 h-3" /> Mirá el video
+                      </span>
+                    </div>
+                  </div>
+                </div>
                 {/* Upload new video button */}
                 <div className="mt-4">
                   <button
-                    onClick={() => fileInputRef.current?.click()}
+                    onClick={(e) => { e.stopPropagation(); fileInputRef.current?.click() }}
                     disabled={uploading}
                     className="text-sm text-gray-400 hover:text-emerald-600 transition-colors underline underline-offset-4"
                   >
                     Cambiar video
                   </button>
                 </div>
-              </div>
+              </motion.div>
             ) : uploading ? (
               /* UPLOAD PROGRESS */
               <div className="bg-white rounded-2xl p-8 shadow-lg border border-gray-100 max-w-md mx-auto">
