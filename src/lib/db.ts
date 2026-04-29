@@ -25,6 +25,8 @@ try {
   }
 } catch {}
 
+const POSTGRES_URL = 'postgres://5e2d1ed17a6a9f666959fc0391ef5fab9562fadbfa588b89ab0dd0337a521f7f:sk_TP8XrOblb8JVNEH6H3CRK@db.prisma.io:5432/postgres?sslmode=require'
+
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
@@ -35,7 +37,7 @@ export const db =
     log: ['query'],
     datasources: {
       db: {
-        url: DATABASE_URL,
+        url: POSTGRES_URL,
       },
     },
   })

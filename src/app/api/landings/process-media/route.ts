@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { db } from '@/lib/db'
-import ZAI from 'z-ai-web-dev-sdk'
+
+// Allow up to 60 seconds for AI image generation
+export const maxDuration = 60
 
 // Generate ONE image per request — fast, no timeout issues.
 // Client calls this 3 times sequentially for before/after/after2.
@@ -28,20 +30,49 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'imageIndex fuera de rango' }, { status: 400 })
     }
 
-    // Generate single image
+    // Generate single image using z-ai-generate CLI (more reliable than SDK in serverless)
     console.log(`[process-media] Generating image ${imageIndex} for landing ${landingId}`)
-    const zai = await ZAI.create()
-    const response = await zai.images.generations.create({
-      prompt: prompts[imageIndex],
-      size: '1024x1024',
+    
+    const { execFile } = await import('child_process')
+    const { writeFile, readFile, unlink } = await import('fs/promises')
+    const { join } = await import('path')
+    
+    const tmpPath = `/tmp/img_${Date.now()}_${imageIndex}.png`
+    
+    // Use CLI tool to generate image
+    const prompt = prompts[imageIndex]
+    const truncatedPrompt = prompt.length > 200 ? prompt.substring(0, 200) : prompt
+    
+    await new Promise<void>((resolve, reject) => {
+      const child = execFile(
+        'z-ai-generate',
+        ['-p', prompt, '-o', tmpPath, '-s', '1024x1024'],
+        { timeout: 55000 },
+        (error, stdout, stderr) => {
+          if (error) {
+            console.error('[process-media] CLI error:', error.message)
+            console.error('[process-media] stderr:', stderr)
+            reject(new Error(`Error generando imagen con IA: ${error.message}`))
+            return
+          }
+          console.log('[process-media] CLI stdout:', stdout?.substring(0, 200))
+          resolve()
+        }
+      )
     })
 
-    const base64Data = response.data[0]?.base64
-    if (!base64Data) {
-      throw new Error('La IA no devolvio imagen')
+    // Read the generated image as base64
+    const imageBuffer = await readFile(tmpPath)
+    const base64Data = imageBuffer.toString('base64')
+    
+    // Clean up temp file
+    try { await unlink(tmpPath) } catch {}
+
+    if (!base64Data || base64Data.length < 100) {
+      throw new Error('La IA genero una imagen vacia o invalida')
     }
 
-    const imageUrl = `data:image/jpeg;base64,${base64Data}`
+    const imageUrl = `data:image/png;base64,${base64Data}`
 
     // Read existing images and append
     let existingImages: { url: string; label: string }[] = []
@@ -55,7 +86,7 @@ export async function POST(request: NextRequest) {
       data: { beforeAfterImages: JSON.stringify(existingImages) },
     })
 
-    console.log(`[process-media] Image ${imageIndex} saved for landing ${landingId}`)
+    console.log(`[process-media] Image ${imageIndex} saved for landing ${landingId} (${base64Data.length} chars)`)
     return NextResponse.json({
       success: true,
       image: { url: imageUrl, label: labels[imageIndex] },
@@ -63,7 +94,7 @@ export async function POST(request: NextRequest) {
       totalImages: prompts.length,
     })
   } catch (error: any) {
-    console.error('Image generation error:', error)
+    console.error('[process-media] Image generation error:', error)
     return NextResponse.json({ error: error.message || 'Error generando imagen' }, { status: 500 })
   }
 }
